@@ -1,0 +1,42 @@
+{
+	"schemaVersion": 1,
+	"id": "betterlapras",
+	"version": "${version}",
+	"name": "BetterLapras",
+	"description": "Lapras overworld defense uses Cobblemon Water Pulse VFX (Snowstorm) and move sounds.",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/betterlapras/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "com.celestial_manta.betterlapras.BetterLapras",
+				"adapter": "kotlin"
+			}
+		],
+		"client": [
+			{
+				"value": "com.celestial_manta.betterlapras.BetterLaprasClient",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"mixins": [
+		"betterlapras.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*",
+		"fabric-language-kotlin": "*",
+		"cobblemon": ">=1.7.3"
+	}
+}

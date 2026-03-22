@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "com.celestial_manta.betterlapras.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"LaprasProjectileAttackMixin",
+		"LaprasRangedTickMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

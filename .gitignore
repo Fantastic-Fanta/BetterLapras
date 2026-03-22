@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# Fabric / Loom
+run/
+out/
+classes/
+loom-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env
+*.log
+local.properties
