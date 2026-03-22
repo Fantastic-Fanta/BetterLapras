@@ -26,8 +26,9 @@ import net.minecraft.resources.ResourceLocation
 import kotlin.math.ceil
 
 /**
- * Travelling pulse: **one** Cobblemon Lapras→target beam packet per shot ([PulsePresentation.trailPulseEffect]),
- * sent on the first tick the owner + target resolve; hit uses a **single** world Snowstorm (no collision damage).
+ * Travelling pulse: Cobblemon Lapras→target Snowstorm packet(s) on first valid tick
+ * ([PulsePresentation.trailPulseEffect] + optional [PulsePresentation.trailSecondaryPulseEffect]);
+ * hit uses one world Snowstorm (no collision damage).
  */
 class WaterPulseProjectile(
 	type: EntityType<out WaterPulseProjectile>,
@@ -37,11 +38,11 @@ class WaterPulseProjectile(
 	var pulseDamage: Double = 1.0
 		private set
 
-	private var pulseKind: LaprasPulseKind = LaprasPulseKind.WATER_DEFAULT
+	private var pulseKind: LaprasPulseKind = LaprasPulseKind.WATER_GUN_OFFTYPE
 	private var presentation: PulsePresentation =
-		LaprasMoveShotProfiles.presentationForKind(LaprasPulseKind.WATER_DEFAULT)
+		LaprasMoveShotProfiles.presentationForKind(LaprasPulseKind.WATER_GUN_OFFTYPE)
 
-	/** True after the one-shot entity-linked beam VFX has been sent (persisted so reloads don’t re-fire). */
+	/** True after trail burst(s) for this shot have been sent (persisted so reloads don’t re-fire). */
 	private var trailPulseEmitted: Boolean = false
 
 	/** Network id of the combat target; used for entity-linked trail packets. */
@@ -77,7 +78,7 @@ class WaterPulseProjectile(
 	override fun addAdditionalSaveData(tag: CompoundTag) {
 		super.addAdditionalSaveData(tag)
 		tag.putDouble("PulseDamage", pulseDamage)
-		tag.putInt("BetterLaprasPulseKind", pulseKind.ordinal)
+		tag.putString(LaprasPulseKind.NBT_KIND_ID, pulseKind.name)
 		tag.putInt("BetterLaprasImpactTick", impactServerTick)
 		tag.putInt("BetterLaprasVictimId", scheduledVictimEntityId)
 		tag.putBoolean("BetterLaprasImpactDelivered", impactDelivered)
@@ -91,8 +92,11 @@ class WaterPulseProjectile(
 		if (tag.contains("PulseDamage")) {
 			pulseDamage = tag.getDouble("PulseDamage")
 		}
-		if (tag.contains("BetterLaprasPulseKind")) {
-			setPulseStyle(LaprasPulseKind.fromOrdinal(tag.getInt("BetterLaprasPulseKind")))
+		when {
+			tag.contains(LaprasPulseKind.NBT_KIND_ID) ->
+				setPulseStyle(LaprasPulseKind.fromPersistentId(tag.getString(LaprasPulseKind.NBT_KIND_ID)))
+			tag.contains(LaprasPulseKind.NBT_KIND_LEGACY_ORDINAL) ->
+				setPulseStyle(LaprasPulseKind.fromLegacyOrdinal(tag.getInt(LaprasPulseKind.NBT_KIND_LEGACY_ORDINAL)))
 		}
 		if (tag.contains("BetterLaprasImpactTick")) {
 			impactServerTick = tag.getInt("BetterLaprasImpactTick")
@@ -155,7 +159,7 @@ class WaterPulseProjectile(
 		if (!skipHitsUntilScheduledImpact &&
 			level().getBlockStates(boundingBox).noneMatch { obj: BlockBehaviour.BlockStateBase -> obj.isAir }
 		) {
-			if (pulseKind == LaprasPulseKind.ICE_BEAM) {
+			if (shouldClearPreBeamFreezeOnMiss()) {
 				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
 			}
 			discard()
@@ -174,10 +178,11 @@ class WaterPulseProjectile(
 		}
 	}
 
-	private fun iceSlownessAppliesNow(): Boolean {
-		if (pulseKind != LaprasPulseKind.ICE_BEAM) return false
-		return (owner as? PokemonEntity)?.slot1MoveIsIceType() == true
-	}
+	private fun shouldClearPreBeamFreezeOnMiss(): Boolean =
+		pulseKind == LaprasPulseKind.ICE_BEAM_MOVE
+
+	private fun shouldApplyPostHitIceSlow(): Boolean =
+		pulseKind == LaprasPulseKind.ICE_BEAM_MOVE || pulseKind == LaprasPulseKind.ICE_SHARD
 
 	private fun beamTargetLostOrDead(): Boolean {
 		if (beamTargetId == 0) return false
@@ -200,24 +205,30 @@ class WaterPulseProjectile(
 		packet.sendToPlayersAround(ax, ay, az, WORLD_PARTICLE_RANGE, sl.dimension()) { false }
 	}
 
-	/** One-shot Cobblemon beam (Lapras special/target → target). Returns false if owner/target not ready yet. */
+	/** Cobblemon beam(s) Lapras → target. Returns false if owner/target not ready yet. */
 	private fun tryEmitTrailPulseOnce(): Boolean {
 		val lapras = owner as? PokemonEntity ?: return false
 		if (beamTargetId == 0) return false
 		val tgt = level().getEntity(beamTargetId) ?: return false
 		if (!tgt.isAlive || tgt !is LivingEntity) return false
-		broadcastEntitySnowstorm(
-			SpawnSnowstormEntityParticlePacket(
-				presentation.trailPulseEffect,
-				lapras.id,
-				SOURCE_LOCATORS_BEAM,
-				tgt.id,
-				TARGET_LOCATORS_BEAM,
-			),
-			lapras.x,
-			lapras.y,
-			lapras.z,
-		)
+		val srcLoc = presentation.trailSourceLocators
+		val tgtLoc = presentation.trailTargetLocators
+		fun send(effect: ResourceLocation) {
+			broadcastEntitySnowstorm(
+				SpawnSnowstormEntityParticlePacket(
+					effect,
+					lapras.id,
+					srcLoc,
+					tgt.id,
+					tgtLoc,
+				),
+				lapras.x,
+				lapras.y,
+				lapras.z,
+			)
+		}
+		send(presentation.trailPulseEffect)
+		presentation.trailSecondaryPulseEffect?.let { send(it) }
 		return true
 	}
 
@@ -234,7 +245,7 @@ class WaterPulseProjectile(
 		super.onHitBlock(blockHitResult)
 		if (!level().isClientSide && level() is ServerLevel) {
 			impactCancelled = true
-			if (iceSlownessAppliesNow()) {
+			if (shouldClearPreBeamFreezeOnMiss()) {
 				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
 			}
 			val pos = Vec3.atCenterOf(blockHitResult.blockPos)
@@ -248,7 +259,7 @@ class WaterPulseProjectile(
 		impactDelivered = true
 		val victim = serverLevel.getEntity(scheduledVictimEntityId) as? LivingEntity
 		if (victim == null || !victim.isAlive) {
-			if (pulseKind == LaprasPulseKind.ICE_BEAM) {
+			if (shouldClearPreBeamFreezeOnMiss()) {
 				LaprasIceBeamEffects.clearHeavySlownessFromMiss(serverLevel.getEntity(beamTargetId) as? LivingEntity)
 			}
 			discard()
@@ -278,7 +289,7 @@ class WaterPulseProjectile(
 			EnchantmentHelper.doPostAttackEffects(serverLevel, victim, src)
 		}
 
-		if (iceSlownessAppliesNow()) {
+		if (shouldApplyPostHitIceSlow()) {
 			LaprasIceBeamEffects.applyPostHitSlow(victim)
 		}
 	}
@@ -292,9 +303,6 @@ class WaterPulseProjectile(
 	}
 
 	companion object {
-		private val SOURCE_LOCATORS_BEAM: List<String> = listOf("special", "target")
-		private val TARGET_LOCATORS_BEAM: List<String> = listOf("target")
-
 		private const val WORLD_PARTICLE_RANGE = 128.0
 
 		private const val IMPACT_PAD_TICKS: Int = 18

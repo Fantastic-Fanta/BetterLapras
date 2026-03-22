@@ -17,9 +17,9 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.sqrt
 
 /**
- * Lapras overworld defense: Cobblemon Water Pulse–style projectiles (Snowstorm VFX + move sounds).
- * - [RANGED_MIN_DISTANCE]–[RANGED_MAX_DISTANCE]: volley while Cobblemon has a combat target (tick).
- * - Melee hook: [doHurtTarget] mixin still replaces point-blank hits (shared cooldown).
+ * Lapras overworld defense: Cobblemon move-style pulses (Snowstorm VFX + sounds).
+ * Ranged distance limits come from [LaprasShotProfile] per slot-1 move; see [RANGED_DISTANCE_HINT_*] for UI.
+ * Melee hook: [doHurtTarget] mixin still replaces point-blank hits (shared cooldown).
  */
 object LaprasProjectileCombat {
 	/** 3 seconds between volleys (20 tps → 60 ticks). */
@@ -27,19 +27,12 @@ object LaprasProjectileCombat {
 
 	private const val PULSE_COUNT = 1
 
-	/** Applied after base damage from level ([BASE_PULSE_DAMAGE_MIN]–[BASE_PULSE_DAMAGE_MAX]). */
-	private const val PULSE_DAMAGE_MULTIPLIER = 3.0
-
-	private const val BASE_PULSE_DAMAGE_MIN = 0.65
-	private const val BASE_PULSE_DAMAGE_PER_LEVEL = 0.2
-	private const val BASE_PULSE_DAMAGE_MAX = 2.75
-
 	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
 
-	/** Below this, only the melee ([doHurtTarget]) path typically runs; above [RANGED_MAX_DISTANCE], no shot. */
-	const val RANGED_MIN_DISTANCE = 4.0
-	const val RANGED_MAX_DISTANCE = 50.0
+	/** Broad band for command/UI text; real min/max are on each [LaprasShotProfile]. */
+	const val RANGED_DISTANCE_HINT_MIN_BLOCKS = 1.0
+	const val RANGED_DISTANCE_HINT_MAX_BLOCKS = 60.0
 
 	private val lastShotGameTick = ConcurrentHashMap<UUID, Int>()
 
@@ -53,13 +46,12 @@ object LaprasProjectileCombat {
 		if (!target.isAlive) return
 		if (!entity.hasLineOfSight(target)) return
 
-		val dist = entity.distanceToTargetHoriz(target)
-		if (dist < RANGED_MIN_DISTANCE || dist > RANGED_MAX_DISTANCE) return
-
 		val profile = LaprasMoveShotProfiles.resolveShotProfile(entity) ?: return
+		val dist = entity.distanceToTargetHoriz(target)
+		if (dist < profile.rangedMinBlocks || dist > profile.rangedMaxBlocks) return
 		if (!tryConsumeCooldown(entity, level)) return
 
-		val perPulseDamage = pulseDamageForLevel(entity.pokemon.level) * profile.damageMultiplier
+		val perPulseDamage = LaprasPulseDamageFormulas.compute(profile.kind, entity.pokemon.level)
 		fireVolley(level, entity, target, perPulseDamage, profile)
 	}
 
@@ -74,7 +66,7 @@ object LaprasProjectileCombat {
 		val level = attacker.level() as? ServerLevel ?: return false
 		if (!tryConsumeCooldown(attacker, level)) return true
 
-		val perPulseDamage = pulseDamageForLevel(attacker.pokemon.level) * profile.damageMultiplier
+		val perPulseDamage = LaprasPulseDamageFormulas.compute(profile.kind, attacker.pokemon.level)
 		fireVolley(level, attacker, target, perPulseDamage, profile)
 		return true
 	}
@@ -126,7 +118,7 @@ object LaprasProjectileCombat {
 		val spawnOrigin = eye.add(towardMouth.scale(MOUTH_OFFSET_ALONG_SHOT))
 		val aim = targetEye.subtract(spawnOrigin).normalize()
 
-		if (profile.kind == LaprasPulseKind.ICE_BEAM && attacker.slot1MoveIsIceType()) {
+		if (profile.kind == LaprasPulseKind.ICE_BEAM_MOVE) {
 			val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(
 				spawnOrigin,
 				targetEye,
@@ -151,12 +143,6 @@ object LaprasProjectileCombat {
 		repeat(PULSE_COUNT) {
 			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage, profile)
 		}
-	}
-
-	private fun pulseDamageForLevel(level: Int): Double {
-		val base = (BASE_PULSE_DAMAGE_MIN + level * BASE_PULSE_DAMAGE_PER_LEVEL)
-			.coerceIn(BASE_PULSE_DAMAGE_MIN, BASE_PULSE_DAMAGE_MAX)
-		return base * PULSE_DAMAGE_MULTIPLIER
 	}
 
 	private fun fireOne(
