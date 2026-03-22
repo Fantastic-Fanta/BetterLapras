@@ -23,14 +23,23 @@ import kotlin.math.sqrt
  * - Melee hook: [doHurtTarget] mixin still replaces point-blank hits (shared cooldown).
  */
 object LaprasProjectileCombat {
-	/**
-	 * Minimum ticks between volleys. Lapras ground `special` attack anim is 3s (60 ticks); spacing
-	 * attacks at least that far lets each shot play the full pose instead of restarting mid-anim.
-	 */
+	/** 3 seconds between volleys (20 tps → 60 ticks). */
 	private const val COOLDOWN_TICKS = 60
-	private const val PROJECTILE_SPEED = 3.4f
+
+	/** Blocks per tick along the shot (higher = faster pulses). */
+	private const val PROJECTILE_SPEED = 7.25f
+
+	/** `Projectile.shoot` spread; higher = wider random cone per pulse. */
 	private const val INACCURACY = 3.5f
-	private const val PULSE_COUNT = 2
+
+	private const val PULSE_COUNT = 1
+
+	/** Applied after base damage from level ([BASE_PULSE_DAMAGE_MIN]–[BASE_PULSE_DAMAGE_MAX]). */
+	private const val PULSE_DAMAGE_MULTIPLIER = 3.0
+
+	private const val BASE_PULSE_DAMAGE_MIN = 0.65
+	private const val BASE_PULSE_DAMAGE_PER_LEVEL = 0.2
+	private const val BASE_PULSE_DAMAGE_MAX = 2.75
 
 	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
@@ -46,7 +55,7 @@ object LaprasProjectileCombat {
 
 	/** Below this, only the melee ([doHurtTarget]) path typically runs; above [RANGED_MAX_DISTANCE], no shot. */
 	const val RANGED_MIN_DISTANCE = 4.0
-	const val RANGED_MAX_DISTANCE = 30.0
+	const val RANGED_MAX_DISTANCE = 50.0
 
 	private val lastShotGameTick = ConcurrentHashMap<UUID, Int>()
 
@@ -65,7 +74,7 @@ object LaprasProjectileCombat {
 
 		if (!tryConsumeCooldown(entity, level)) return
 
-		val perPulseDamage = (0.65 + entity.pokemon.level * 0.12).coerceIn(0.65, 2.75)
+		val perPulseDamage = pulseDamageForLevel(entity.pokemon.level)
 		fireVolley(level, entity, target, perPulseDamage)
 	}
 
@@ -78,7 +87,7 @@ object LaprasProjectileCombat {
 		val level = attacker.level() as? ServerLevel ?: return false
 		if (!tryConsumeCooldown(attacker, level)) return true
 
-		val perPulseDamage = (0.65 + attacker.pokemon.level * 0.12).coerceIn(0.65, 2.75)
+		val perPulseDamage = pulseDamageForLevel(attacker.pokemon.level)
 		fireVolley(level, attacker, target, perPulseDamage)
 		return true
 	}
@@ -160,9 +169,15 @@ object LaprasProjectileCombat {
 			attacker.z,
 		)
 
-		for (i in 0 until PULSE_COUNT) {
-			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage, i)
+		repeat(PULSE_COUNT) {
+			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage)
 		}
+	}
+
+	private fun pulseDamageForLevel(level: Int): Double {
+		val base = (BASE_PULSE_DAMAGE_MIN + level * BASE_PULSE_DAMAGE_PER_LEVEL)
+			.coerceIn(BASE_PULSE_DAMAGE_MIN, BASE_PULSE_DAMAGE_MAX)
+		return base * PULSE_DAMAGE_MULTIPLIER
 	}
 
 	private fun fireOne(
@@ -173,7 +188,6 @@ object LaprasProjectileCombat {
 		targetEye: Vec3,
 		dir: Vec3,
 		damage: Double,
-		index: Int,
 	) {
 		val pulse = WaterPulseProjectile(BetterLaprasEntities.WATER_PULSE, level)
 		pulse.setOwner(shooter)
@@ -183,13 +197,7 @@ object LaprasProjectileCombat {
 		pulse.setScheduledImpact(level.server.tickCount + delayTicks, target.id)
 		pulse.moveTo(origin.x, origin.y, origin.z, shooter.yRot, shooter.xRot)
 
-		val spread = (index - PULSE_COUNT / 2) * 0.04
-		val vx = dir.x + spread * 0.15
-		val vy = dir.y + spread * 0.08
-		val vz = dir.z + spread * 0.15
-		val vec = Vec3(vx, vy, vz).normalize()
-
-		pulse.shoot(vec.x, vec.y, vec.z, PROJECTILE_SPEED, INACCURACY)
+		pulse.shoot(dir.x, dir.y, dir.z, PROJECTILE_SPEED, INACCURACY)
 		level.addFreshEntity(pulse)
 	}
 
