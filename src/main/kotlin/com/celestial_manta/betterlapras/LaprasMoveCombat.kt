@@ -40,6 +40,7 @@ object LaprasMoveCombat {
 	fun tickRangedVolley(entity: PokemonEntity) {
 		if (entity.level().isClientSide) return
 		if (!isLaprasMoveStrikeContext(entity)) return
+		if (LaprasSlot1SupportMoves.suppressesCombat(entity)) return
 
 		val level = entity.level() as? ServerLevel ?: return
 		val target = entity.resolveCombatTarget() ?: return
@@ -60,6 +61,7 @@ object LaprasMoveCombat {
 		if (attacker.level().isClientSide) return false
 		if (target !is LivingEntity || !target.isAlive) return false
 		if (!isLaprasMoveStrikeContext(attacker)) return false
+		if (LaprasSlot1SupportMoves.suppressesCombat(attacker)) return false
 
 		val profile = LaprasMoveShotProfiles.resolveShotProfile(attacker) ?: return false
 
