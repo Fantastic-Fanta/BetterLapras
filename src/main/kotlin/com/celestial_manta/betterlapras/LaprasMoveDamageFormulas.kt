@@ -24,10 +24,10 @@ object LaprasMoveDamageFormulas {
 		(2.0 + level * 0.35).coerceIn(2.0, 14.0)
 
 	private fun sheerCold(level: Int): Double =
-		(10.0 + level * 0.75).coerceIn(10.0, 70.0)
+		(10.0 + level * 0.75).coerceIn(10.0, 70.0) * 0.5
 
 	private fun iceShard(level: Int): Double =
-		(2.0 + level * 0.28).coerceIn(1.0, 12.0)
+		(2.0 + level * 0.28).coerceIn(1.0, 12.0) * 0.25
 
 	private fun hydroPump(level: Int): Double =
 		(3.2 + level * 0.32).coerceIn(3.2, 23.0)

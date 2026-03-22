@@ -45,6 +45,10 @@ class LaprasMoveProjectile(
 
 	private var beamTargetId: Int = 0
 
+	/** Sheer Cold cone: mouth origin and aimed strike point (world space) at spawn. */
+	private var sheerColdApex: Vec3? = null
+	private var sheerColdTargetPoint: Vec3? = null
+
 	private var impactServerTick: Int = -1
 	private var scheduledVictimEntityId: Int = 0
 	private var impactDelivered: Boolean = false
@@ -69,6 +73,11 @@ class LaprasMoveProjectile(
 		scheduledVictimEntityId = victimEntityId
 	}
 
+	fun setSheerColdCone(apex: Vec3, targetPoint: Vec3) {
+		sheerColdApex = apex
+		sheerColdTargetPoint = targetPoint
+	}
+
 	override fun defineSynchedData(builder: SynchedEntityData.Builder) {}
 
 	override fun addAdditionalSaveData(tag: CompoundTag) {
@@ -81,6 +90,15 @@ class LaprasMoveProjectile(
 		tag.putBoolean("BetterLaprasImpactCancelled", impactCancelled)
 		tag.putInt("BetterLaprasBeamTarget", beamTargetId)
 		tag.putBoolean("BetterLaprasTrailPulseEmitted", trailBurstSent)
+		if (sheerColdApex != null && sheerColdTargetPoint != null) {
+			tag.putBoolean("BetterLaprasSheerCone", true)
+			tag.putDouble("BetterLaprasSheerAx", sheerColdApex!!.x)
+			tag.putDouble("BetterLaprasSheerAy", sheerColdApex!!.y)
+			tag.putDouble("BetterLaprasSheerAz", sheerColdApex!!.z)
+			tag.putDouble("BetterLaprasSheerTx", sheerColdTargetPoint!!.x)
+			tag.putDouble("BetterLaprasSheerTy", sheerColdTargetPoint!!.y)
+			tag.putDouble("BetterLaprasSheerTz", sheerColdTargetPoint!!.z)
+		}
 	}
 
 	override fun readAdditionalSaveData(tag: CompoundTag) {
@@ -113,6 +131,21 @@ class LaprasMoveProjectile(
 		}
 		if (tag.contains("BetterLaprasTrailPulseEmitted")) {
 			trailBurstSent = tag.getBoolean("BetterLaprasTrailPulseEmitted")
+		}
+		if (tag.getBoolean("BetterLaprasSheerCone")) {
+			sheerColdApex = Vec3(
+				tag.getDouble("BetterLaprasSheerAx"),
+				tag.getDouble("BetterLaprasSheerAy"),
+				tag.getDouble("BetterLaprasSheerAz"),
+			)
+			sheerColdTargetPoint = Vec3(
+				tag.getDouble("BetterLaprasSheerTx"),
+				tag.getDouble("BetterLaprasSheerTy"),
+				tag.getDouble("BetterLaprasSheerTz"),
+			)
+		} else {
+			sheerColdApex = null
+			sheerColdTargetPoint = null
 		}
 	}
 
@@ -262,8 +295,69 @@ class LaprasMoveProjectile(
 			discard()
 			return
 		}
-		applyHitToLiving(victim, serverLevel)
+		if (moveProfileKind == LaprasPulseKind.SHEER_COLD) {
+			val apex = sheerColdApex
+			val aim = sheerColdTargetPoint
+			if (apex != null && aim != null) {
+				applySheerColdConeImpact(serverLevel, victim, apex, aim)
+			} else {
+				applyHitToLiving(victim, serverLevel)
+			}
+		} else {
+			applyHitToLiving(victim, serverLevel)
+		}
 		discard()
+	}
+
+	private fun applySheerColdConeImpact(
+		serverLevel: ServerLevel,
+		primaryVictim: LivingEntity,
+		apex: Vec3,
+		targetPoint: Vec3,
+	) {
+		val lapras = owner as? PokemonEntity ?: run {
+			applyHitToLiving(primaryVictim, serverLevel)
+			return
+		}
+		val ownerPlayer = lapras.ownerUUID?.let { serverLevel.server.playerList.getPlayer(it) }
+
+		dealSheerColdToVictim(serverLevel, primaryVictim, strikeDamage, playFullSounds = true)
+
+		val box = LaprasSheerColdCone.queryRoughAabb(apex, targetPoint)
+		for (entity in serverLevel.getEntitiesOfClass(LivingEntity::class.java, box)) {
+			if (!entity.isAlive) continue
+			if (entity == lapras) continue
+			if (ownerPlayer != null && entity == ownerPlayer) continue
+			if (entity.id == primaryVictim.id) continue
+			val sample = LaprasSheerColdCone.entitySamplePoint(entity)
+			if (!LaprasSheerColdCone.isInCone(apex, targetPoint, sample)) continue
+			dealSheerColdToVictim(serverLevel, entity, strikeDamage * 0.5, playFullSounds = false)
+		}
+	}
+
+	private fun dealSheerColdToVictim(
+		serverLevel: ServerLevel,
+		victim: LivingEntity,
+		damage: Double,
+		playFullSounds: Boolean,
+	) {
+		val ownerEntity = owner
+		if (playFullSounds) {
+			playCobblemonSound(serverLevel, victim.position(), presentation.targetSoundPathPrimary)
+			presentation.targetSoundPathSecondary?.let {
+				playCobblemonSound(serverLevel, victim.position(), it)
+			}
+		}
+		val hitPos = victim.betterLaprasStrikeTargetPoint(1f)
+		spawnSnowstormWorld(presentation.targetEffect, hitPos)
+		val src: DamageSource = when (ownerEntity) {
+			is LivingEntity -> damageSources().thrown(this, ownerEntity)
+			else -> damageSources().magic()
+		}
+		if (victim.hurt(src, damage.toFloat())) {
+			EnchantmentHelper.doPostAttackEffects(serverLevel, victim, src)
+		}
+		LaprasIceBeamEffects.applyPostHitSlow(victim)
 	}
 
 	private fun applyHitToLiving(victim: LivingEntity, serverLevel: ServerLevel) {
@@ -274,7 +368,7 @@ class LaprasMoveProjectile(
 			playCobblemonSound(serverLevel, victim.position(), it)
 		}
 
-		val hitPos = victim.getEyePosition(1f)
+		val hitPos = victim.betterLaprasStrikeTargetPoint(1f)
 		spawnSnowstormWorld(presentation.targetEffect, hitPos)
 
 		val src: DamageSource = when (ownerEntity) {

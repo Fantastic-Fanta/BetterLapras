@@ -22,8 +22,11 @@ import kotlin.math.sqrt
  * Melee: [doHurtTarget] mixin may replace with a move strike (shared cooldown).
  */
 object LaprasMoveCombat {
-	/** 3 seconds between volleys (20 tps → 60 ticks). */
+	/** Default 3 seconds between volleys (20 tps → 60 ticks). */
 	private const val COOLDOWN_TICKS = 60
+
+	/** Ice Shard: 1/3 of default volley spacing (20 ticks ≈ 1 s). */
+	private const val ICE_SHARD_COOLDOWN_TICKS = COOLDOWN_TICKS / 3
 
 	private const val PROJECTILES_PER_VOLLEY = 1
 
@@ -50,7 +53,7 @@ object LaprasMoveCombat {
 		val profile = LaprasMoveShotProfiles.resolveShotProfile(entity) ?: return
 		val dist = entity.distanceToTargetHoriz(target)
 		if (dist < profile.rangedMinBlocks || dist > profile.rangedMaxBlocks) return
-		if (!tryConsumeCooldown(entity, level)) return
+		if (!tryConsumeCooldown(entity, level, profile.kind)) return
 
 		val strikeDamage = LaprasMoveDamageFormulas.compute(profile.kind, entity.pokemon.level)
 		fireVolley(level, entity, target, strikeDamage, profile)
@@ -66,7 +69,7 @@ object LaprasMoveCombat {
 		val profile = LaprasMoveShotProfiles.resolveShotProfile(attacker) ?: return false
 
 		val level = attacker.level() as? ServerLevel ?: return false
-		if (!tryConsumeCooldown(attacker, level)) return true
+		if (!tryConsumeCooldown(attacker, level, profile.kind)) return true
 
 		val strikeDamage = LaprasMoveDamageFormulas.compute(profile.kind, attacker.pokemon.level)
 		fireVolley(level, attacker, target, strikeDamage, profile)
@@ -92,11 +95,15 @@ object LaprasMoveCombat {
 		return sqrt(dx * dx + dz * dz)
 	}
 
-	private fun tryConsumeCooldown(attacker: PokemonEntity, level: ServerLevel): Boolean {
+	private fun cooldownTicksFor(kind: LaprasPulseKind): Int =
+		if (kind == LaprasPulseKind.ICE_SHARD) ICE_SHARD_COOLDOWN_TICKS else COOLDOWN_TICKS
+
+	private fun tryConsumeCooldown(attacker: PokemonEntity, level: ServerLevel, kind: LaprasPulseKind): Boolean {
 		val now = level.server.tickCount
 		val uuid = attacker.uuid
-		val last = lastShotGameTick[uuid] ?: -COOLDOWN_TICKS * 2
-		if (now - last < COOLDOWN_TICKS) return false
+		val required = cooldownTicksFor(kind)
+		val last = lastShotGameTick[uuid] ?: -required * 2
+		if (now - last < required) return false
 		lastShotGameTick[uuid] = now
 		return true
 	}
@@ -111,7 +118,7 @@ object LaprasMoveCombat {
 		orientPokemonTowardTarget(attacker, target)
 
 		val eye = attacker.getEyePosition(1f)
-		val targetEye = target.getEyePosition(1f)
+		val targetEye = target.betterLaprasStrikeTargetPoint(1f)
 		val toTarget = targetEye.subtract(eye)
 		val lenSq = toTarget.lengthSqr()
 		if (lenSq < 1.0e-6) return
@@ -167,6 +174,9 @@ object LaprasMoveCombat {
 		)
 		projectile.setScheduledImpact(level.server.tickCount + delayTicks, target.id)
 		projectile.moveTo(origin.x, origin.y, origin.z, shooter.yRot, shooter.xRot)
+		if (profile.kind == LaprasPulseKind.SHEER_COLD) {
+			projectile.setSheerColdCone(origin, targetEye)
+		}
 
 		projectile.shoot(dir.x, dir.y, dir.z, speed, profile.inaccuracy)
 		level.addFreshEntity(projectile)
@@ -174,7 +184,7 @@ object LaprasMoveCombat {
 
 	private fun orientPokemonTowardTarget(pokemon: PokemonEntity, target: LivingEntity) {
 		val eye = pokemon.getEyePosition(1f)
-		val targetEye = target.getEyePosition(1f)
+		val targetEye = target.betterLaprasStrikeTargetPoint(1f)
 		val dx = targetEye.x - eye.x
 		val dz = targetEye.z - eye.z
 		val yRot = Mth.wrapDegrees((Mth.atan2(dz, dx) * Mth.RAD_TO_DEG).toFloat() - 90.0f)
