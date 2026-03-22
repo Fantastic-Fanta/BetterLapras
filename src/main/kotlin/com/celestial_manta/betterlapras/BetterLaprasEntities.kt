@@ -7,17 +7,20 @@ import net.minecraft.world.entity.EntityType
 import net.minecraft.world.entity.MobCategory
 
 object BetterLaprasEntities {
-	val WATER_PULSE: EntityType<WaterPulseProjectile> = Registry.register(
+	private val LAPRAS_MOVE_PROJECTILE_ID: ResourceLocation =
+		ResourceLocation.fromNamespaceAndPath("betterlapras", "lapras_move_projectile")
+
+	val LAPRAS_MOVE_PROJECTILE: EntityType<LaprasMoveProjectile> = Registry.register(
 		BuiltInRegistries.ENTITY_TYPE,
-		ResourceLocation.fromNamespaceAndPath("betterlapras", "water_pulse"),
-		EntityType.Builder.of(::WaterPulseProjectile, MobCategory.MISC)
+		LAPRAS_MOVE_PROJECTILE_ID,
+		EntityType.Builder.of(::LaprasMoveProjectile, MobCategory.MISC)
 			.sized(1.0f, 1.0f)
 			.clientTrackingRange(64)
 			.updateInterval(1)
-			.build(ResourceLocation.fromNamespaceAndPath("betterlapras", "water_pulse").toString()),
+			.build(LAPRAS_MOVE_PROJECTILE_ID.toString()),
 	)
 
 	fun register() {
-		WATER_PULSE.toString()
+		LAPRAS_MOVE_PROJECTILE.toString()
 	}
 }

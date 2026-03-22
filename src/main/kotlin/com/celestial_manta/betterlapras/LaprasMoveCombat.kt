@@ -17,15 +17,15 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.sqrt
 
 /**
- * Lapras overworld defense: Cobblemon move-style pulses (Snowstorm VFX + sounds).
- * Ranged distance limits come from [LaprasShotProfile] per slot-1 move; see [RANGED_DISTANCE_HINT_*] for UI.
- * Melee hook: [doHurtTarget] mixin still replaces point-blank hits (shared cooldown).
+ * Lapras overworld move strikes: Cobblemon Snowstorm VFX + sounds + [LaprasMoveProjectile] spawn.
+ * Ranged gates use [LaprasShotProfile.rangedMinBlocks] / [LaprasShotProfile.rangedMaxBlocks]; see [RANGED_DISTANCE_HINT_*] for `/betterlapras` text.
+ * Melee: [doHurtTarget] mixin may replace with a move strike (shared cooldown).
  */
-object LaprasProjectileCombat {
+object LaprasMoveCombat {
 	/** 3 seconds between volleys (20 tps → 60 ticks). */
 	private const val COOLDOWN_TICKS = 60
 
-	private const val PULSE_COUNT = 1
+	private const val PROJECTILES_PER_VOLLEY = 1
 
 	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
@@ -39,7 +39,7 @@ object LaprasProjectileCombat {
 	@JvmStatic
 	fun tickRangedVolley(entity: PokemonEntity) {
 		if (entity.level().isClientSide) return
-		if (!isLaprasProjectileContext(entity)) return
+		if (!isLaprasMoveStrikeContext(entity)) return
 
 		val level = entity.level() as? ServerLevel ?: return
 		val target = entity.resolveCombatTarget() ?: return
@@ -51,27 +51,27 @@ object LaprasProjectileCombat {
 		if (dist < profile.rangedMinBlocks || dist > profile.rangedMaxBlocks) return
 		if (!tryConsumeCooldown(entity, level)) return
 
-		val perPulseDamage = LaprasPulseDamageFormulas.compute(profile.kind, entity.pokemon.level)
-		fireVolley(level, entity, target, perPulseDamage, profile)
+		val strikeDamage = LaprasMoveDamageFormulas.compute(profile.kind, entity.pokemon.level)
+		fireVolley(level, entity, target, strikeDamage, profile)
 	}
 
 	@JvmStatic
 	fun tryReplaceMeleeWithProjectile(attacker: PokemonEntity, target: Entity): Boolean {
 		if (attacker.level().isClientSide) return false
 		if (target !is LivingEntity || !target.isAlive) return false
-		if (!isLaprasProjectileContext(attacker)) return false
+		if (!isLaprasMoveStrikeContext(attacker)) return false
 
 		val profile = LaprasMoveShotProfiles.resolveShotProfile(attacker) ?: return false
 
 		val level = attacker.level() as? ServerLevel ?: return false
 		if (!tryConsumeCooldown(attacker, level)) return true
 
-		val perPulseDamage = LaprasPulseDamageFormulas.compute(profile.kind, attacker.pokemon.level)
-		fireVolley(level, attacker, target, perPulseDamage, profile)
+		val strikeDamage = LaprasMoveDamageFormulas.compute(profile.kind, attacker.pokemon.level)
+		fireVolley(level, attacker, target, strikeDamage, profile)
 		return true
 	}
 
-	private fun isLaprasProjectileContext(entity: PokemonEntity): Boolean {
+	private fun isLaprasMoveStrikeContext(entity: PokemonEntity): Boolean {
 		if (entity.beamMode != 0) return false
 		if (entity.ownerUUID == null) return false
 		if (entity.level().dimension() != Level.OVERWORLD) return false
@@ -90,7 +90,6 @@ object LaprasProjectileCombat {
 		return sqrt(dx * dx + dz * dz)
 	}
 
-	/** Returns true if an attack (volley) may proceed; false if still on cooldown (caller should skip firing). */
 	private fun tryConsumeCooldown(attacker: PokemonEntity, level: ServerLevel): Boolean {
 		val now = level.server.tickCount
 		val uuid = attacker.uuid
@@ -104,7 +103,7 @@ object LaprasProjectileCombat {
 		level: ServerLevel,
 		attacker: PokemonEntity,
 		target: LivingEntity,
-		perPulseDamage: Double,
+		strikeDamage: Double,
 		profile: LaprasShotProfile,
 	) {
 		orientPokemonTowardTarget(attacker, target)
@@ -119,7 +118,7 @@ object LaprasProjectileCombat {
 		val aim = targetEye.subtract(spawnOrigin).normalize()
 
 		if (profile.kind == LaprasPulseKind.ICE_BEAM_MOVE) {
-			val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(
+			val delayTicks = LaprasMoveProjectile.computeImpactDelayTicks(
 				spawnOrigin,
 				targetEye,
 				profile.projectileSpeed,
@@ -128,7 +127,6 @@ object LaprasProjectileCombat {
 			LaprasIceBeamEffects.applyPreBeamFreeze(target, delayTicks)
 		}
 
-		// Cobblemon poser: battle poses map `special` → lapras `special` / surfacewater_special / water_special.
 		attacker.playAnimation("special", listOf())
 
 		val pres = profile.presentation
@@ -138,43 +136,40 @@ object LaprasProjectileCombat {
 			ResourceLocation.fromNamespaceAndPath("cobblemon", pres.actorSoundPath),
 		)
 
-		// Beam VFX: one packet from [WaterPulseProjectile] on first tick only (was doubled here + every N ticks in-flight).
-
-		repeat(PULSE_COUNT) {
-			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage, profile)
+		repeat(PROJECTILES_PER_VOLLEY) {
+			spawnMoveProjectile(level, attacker, target, spawnOrigin, targetEye, aim, strikeDamage, profile)
 		}
 	}
 
-	private fun fireOne(
+	private fun spawnMoveProjectile(
 		level: ServerLevel,
 		shooter: PokemonEntity,
 		target: LivingEntity,
 		origin: Vec3,
 		targetEye: Vec3,
 		dir: Vec3,
-		damage: Double,
+		strikeDamage: Double,
 		profile: LaprasShotProfile,
 	) {
-		val pulse = WaterPulseProjectile(BetterLaprasEntities.WATER_PULSE, level)
-		pulse.setOwner(shooter)
-		pulse.setBeamTarget(target)
-		pulse.setPulseDamage(damage)
-		pulse.setPulseStyle(profile.kind)
+		val projectile = LaprasMoveProjectile(BetterLaprasEntities.LAPRAS_MOVE_PROJECTILE, level)
+		projectile.setOwner(shooter)
+		projectile.setBeamTarget(target)
+		projectile.setStrikeDamage(strikeDamage)
+		projectile.applyMoveProfile(profile.kind)
 		val speed = profile.projectileSpeed
-		val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(
+		val delayTicks = LaprasMoveProjectile.computeImpactDelayTicks(
 			origin,
 			targetEye,
 			speed,
 			profile.impactPadTicks,
 		)
-		pulse.setScheduledImpact(level.server.tickCount + delayTicks, target.id)
-		pulse.moveTo(origin.x, origin.y, origin.z, shooter.yRot, shooter.xRot)
+		projectile.setScheduledImpact(level.server.tickCount + delayTicks, target.id)
+		projectile.moveTo(origin.x, origin.y, origin.z, shooter.yRot, shooter.xRot)
 
-		pulse.shoot(dir.x, dir.y, dir.z, speed, profile.inaccuracy)
-		level.addFreshEntity(pulse)
+		projectile.shoot(dir.x, dir.y, dir.z, speed, profile.inaccuracy)
+		level.addFreshEntity(projectile)
 	}
 
-	/** Snap Lapras body/head yaw so the model faces the combat target when firing. */
 	private fun orientPokemonTowardTarget(pokemon: PokemonEntity, target: LivingEntity) {
 		val eye = pokemon.getEyePosition(1f)
 		val targetEye = target.getEyePosition(1f)

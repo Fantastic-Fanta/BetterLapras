@@ -6,16 +6,15 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider
 import net.minecraft.resources.ResourceLocation
 
 /**
- * No Minecraft item/model — the pulse is drawn only by Cobblemon Snowstorm packets spawned server-side
- * ([WaterPulseProjectile]) using the same effect ids as move Water Pulse.
+ * Invisible logical projectile — Cobblemon Snowstorm packets from the server provide all visible VFX.
  */
-class WaterPulseRenderer(ctx: EntityRendererProvider.Context) : EntityRenderer<WaterPulseProjectile>(ctx) {
+class LaprasMoveProjectileRenderer(ctx: EntityRendererProvider.Context) : EntityRenderer<LaprasMoveProjectile>(ctx) {
 
-	override fun getTextureLocation(entity: WaterPulseProjectile): ResourceLocation =
+	override fun getTextureLocation(entity: LaprasMoveProjectile): ResourceLocation =
 		ResourceLocation.withDefaultNamespace("textures/misc/white.png")
 
 	override fun shouldRender(
-		entity: WaterPulseProjectile,
+		entity: LaprasMoveProjectile,
 		frustum: Frustum,
 		camX: Double,
 		camY: Double,

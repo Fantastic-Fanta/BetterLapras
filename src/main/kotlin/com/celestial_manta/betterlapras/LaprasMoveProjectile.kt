@@ -26,41 +26,37 @@ import net.minecraft.resources.ResourceLocation
 import kotlin.math.ceil
 
 /**
- * Travelling pulse: Cobblemon Lapras→target Snowstorm packet(s) on first valid tick
- * ([PulsePresentation.trailPulseEffect] + optional [PulsePresentation.trailSecondaryPulseEffect]);
- * hit uses one world Snowstorm (no collision damage).
+ * Server-driven “move strike” entity: Cobblemon Snowstorm trail(s) from Lapras to target, scheduled impact damage,
+ * and profile-specific hit logic. Visuals come from [PulsePresentation] (any move’s Cobblemon effect ids).
  */
-class WaterPulseProjectile(
-	type: EntityType<out WaterPulseProjectile>,
+class LaprasMoveProjectile(
+	type: EntityType<out LaprasMoveProjectile>,
 	level: Level,
 ) : Projectile(type, level) {
 
-	var pulseDamage: Double = 1.0
+	var strikeDamage: Double = 1.0
 		private set
 
-	private var pulseKind: LaprasPulseKind = LaprasPulseKind.WATER_GUN_OFFTYPE
+	private var moveProfileKind: LaprasPulseKind = LaprasPulseKind.WATER_GUN_OFFTYPE
 	private var presentation: PulsePresentation =
 		LaprasMoveShotProfiles.presentationForKind(LaprasPulseKind.WATER_GUN_OFFTYPE)
 
-	/** True after trail burst(s) for this shot have been sent (persisted so reloads don’t re-fire). */
-	private var trailPulseEmitted: Boolean = false
+	private var trailBurstSent: Boolean = false
 
-	/** Network id of the combat target; used for entity-linked trail packets. */
 	private var beamTargetId: Int = 0
 
-	/** Server tick ([net.minecraft.server.MinecraftServer.tickCount]) when [deliverScheduledImpact] runs. */
 	private var impactServerTick: Int = -1
 	private var scheduledVictimEntityId: Int = 0
 	private var impactDelivered: Boolean = false
 	private var impactCancelled: Boolean = false
 
-	fun setPulseDamage(value: Double) {
-		pulseDamage = value
+	fun setStrikeDamage(value: Double) {
+		strikeDamage = value
 	}
 
-	/** Visuals + hit sounds; persisted via [pulseKind] in NBT after chunk reload. */
-	fun setPulseStyle(kind: LaprasPulseKind) {
-		pulseKind = kind
+	/** Binds [LaprasPulseKind] + resolved [PulsePresentation] (NBT: [LaprasPulseKind.NBT_KIND_ID]). */
+	fun applyMoveProfile(kind: LaprasPulseKind) {
+		moveProfileKind = kind
 		presentation = LaprasMoveShotProfiles.presentationForKind(kind)
 	}
 
@@ -77,26 +73,28 @@ class WaterPulseProjectile(
 
 	override fun addAdditionalSaveData(tag: CompoundTag) {
 		super.addAdditionalSaveData(tag)
-		tag.putDouble("PulseDamage", pulseDamage)
-		tag.putString(LaprasPulseKind.NBT_KIND_ID, pulseKind.name)
+		tag.putDouble(NBT_STRIKE_DAMAGE, strikeDamage)
+		tag.putString(LaprasPulseKind.NBT_KIND_ID, moveProfileKind.name)
 		tag.putInt("BetterLaprasImpactTick", impactServerTick)
 		tag.putInt("BetterLaprasVictimId", scheduledVictimEntityId)
 		tag.putBoolean("BetterLaprasImpactDelivered", impactDelivered)
 		tag.putBoolean("BetterLaprasImpactCancelled", impactCancelled)
 		tag.putInt("BetterLaprasBeamTarget", beamTargetId)
-		tag.putBoolean("BetterLaprasTrailPulseEmitted", trailPulseEmitted)
+		tag.putBoolean("BetterLaprasTrailPulseEmitted", trailBurstSent)
 	}
 
 	override fun readAdditionalSaveData(tag: CompoundTag) {
 		super.readAdditionalSaveData(tag)
-		if (tag.contains("PulseDamage")) {
-			pulseDamage = tag.getDouble("PulseDamage")
+		strikeDamage = when {
+			tag.contains(NBT_STRIKE_DAMAGE) -> tag.getDouble(NBT_STRIKE_DAMAGE)
+			tag.contains(NBT_STRIKE_DAMAGE_LEGACY) -> tag.getDouble(NBT_STRIKE_DAMAGE_LEGACY)
+			else -> strikeDamage
 		}
 		when {
 			tag.contains(LaprasPulseKind.NBT_KIND_ID) ->
-				setPulseStyle(LaprasPulseKind.fromPersistentId(tag.getString(LaprasPulseKind.NBT_KIND_ID)))
+				applyMoveProfile(LaprasPulseKind.fromPersistentId(tag.getString(LaprasPulseKind.NBT_KIND_ID)))
 			tag.contains(LaprasPulseKind.NBT_KIND_LEGACY_ORDINAL) ->
-				setPulseStyle(LaprasPulseKind.fromLegacyOrdinal(tag.getInt(LaprasPulseKind.NBT_KIND_LEGACY_ORDINAL)))
+				applyMoveProfile(LaprasPulseKind.fromLegacyOrdinal(tag.getInt(LaprasPulseKind.NBT_KIND_LEGACY_ORDINAL)))
 		}
 		if (tag.contains("BetterLaprasImpactTick")) {
 			impactServerTick = tag.getInt("BetterLaprasImpactTick")
@@ -114,7 +112,7 @@ class WaterPulseProjectile(
 			beamTargetId = tag.getInt("BetterLaprasBeamTarget")
 		}
 		if (tag.contains("BetterLaprasTrailPulseEmitted")) {
-			trailPulseEmitted = tag.getBoolean("BetterLaprasTrailPulseEmitted")
+			trailBurstSent = tag.getBoolean("BetterLaprasTrailPulseEmitted")
 		}
 	}
 
@@ -170,19 +168,19 @@ class WaterPulseProjectile(
 		applyGravity()
 		setPos(x, y, z)
 
-		if (!level().isClientSide && level() is ServerLevel && !trailPulseEmitted) {
+		if (!level().isClientSide && level() is ServerLevel && !trailBurstSent) {
 			when {
-				tryEmitTrailPulseOnce() -> trailPulseEmitted = true
-				beamTargetLostOrDead() -> trailPulseEmitted = true
+				tryEmitTrailBurstsOnce() -> trailBurstSent = true
+				beamTargetLostOrDead() -> trailBurstSent = true
 			}
 		}
 	}
 
 	private fun shouldClearPreBeamFreezeOnMiss(): Boolean =
-		pulseKind == LaprasPulseKind.ICE_BEAM_MOVE
+		moveProfileKind == LaprasPulseKind.ICE_BEAM_MOVE
 
 	private fun shouldApplyPostHitIceSlow(): Boolean =
-		pulseKind == LaprasPulseKind.ICE_BEAM_MOVE || pulseKind == LaprasPulseKind.ICE_SHARD
+		moveProfileKind == LaprasPulseKind.ICE_BEAM_MOVE || moveProfileKind == LaprasPulseKind.ICE_SHARD
 
 	private fun beamTargetLostOrDead(): Boolean {
 		if (beamTargetId == 0) return false
@@ -205,8 +203,7 @@ class WaterPulseProjectile(
 		packet.sendToPlayersAround(ax, ay, az, WORLD_PARTICLE_RANGE, sl.dimension()) { false }
 	}
 
-	/** Cobblemon beam(s) Lapras → target. Returns false if owner/target not ready yet. */
-	private fun tryEmitTrailPulseOnce(): Boolean {
+	private fun tryEmitTrailBurstsOnce(): Boolean {
 		val lapras = owner as? PokemonEntity ?: return false
 		if (beamTargetId == 0) return false
 		val tgt = level().getEntity(beamTargetId) ?: return false
@@ -278,14 +275,13 @@ class WaterPulseProjectile(
 		}
 
 		val hitPos = victim.getEyePosition(1f)
-		// Single world Snowstorm on hit (was target + splash = two stacked beams/bursts).
 		spawnSnowstormWorld(presentation.targetEffect, hitPos)
 
 		val src: DamageSource = when (ownerEntity) {
 			is LivingEntity -> damageSources().thrown(this, ownerEntity)
 			else -> damageSources().magic()
 		}
-		if (victim.hurt(src, pulseDamage.toFloat())) {
+		if (victim.hurt(src, strikeDamage.toFloat())) {
 			EnchantmentHelper.doPostAttackEffects(serverLevel, victim, src)
 		}
 
@@ -303,6 +299,9 @@ class WaterPulseProjectile(
 	}
 
 	companion object {
+		private const val NBT_STRIKE_DAMAGE = "BetterLaprasStrikeDamage"
+		private const val NBT_STRIKE_DAMAGE_LEGACY = "PulseDamage"
+
 		private const val WORLD_PARTICLE_RANGE = 128.0
 
 		private const val IMPACT_PAD_TICKS: Int = 18

@@ -8,7 +8,7 @@ object BetterLaprasClient : ClientModInitializer {
 	private val logger = LoggerFactory.getLogger("betterlapras")
 
 	override fun onInitializeClient() {
-		EntityRendererRegistry.register(BetterLaprasEntities.WATER_PULSE, ::WaterPulseRenderer)
+		EntityRendererRegistry.register(BetterLaprasEntities.LAPRAS_MOVE_PROJECTILE, ::LaprasMoveProjectileRenderer)
 		logger.info("BetterLapras client initialized")
 	}
 }

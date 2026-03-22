@@ -7,7 +7,8 @@ import net.minecraft.resources.ResourceLocation
 private fun rl(path: String): ResourceLocation = ResourceLocation.parse(path)
 
 /**
- * Persisted on projectiles / resolved from slot-1 move. Each maps to distinct VFX + range + damage formula.
+ * Strike profile id: saved on [LaprasMoveProjectile] and resolved from Lapras slot-1 move.
+ * Drives VFX, range, and [LaprasMoveDamageFormulas].
  */
 enum class LaprasPulseKind {
 	ICE_BEAM_MOVE,

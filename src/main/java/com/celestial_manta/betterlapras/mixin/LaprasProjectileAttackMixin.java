@@ -1,6 +1,6 @@
 package com.celestial_manta.betterlapras.mixin;
 
-import com.celestial_manta.betterlapras.LaprasProjectileCombat;
+import com.celestial_manta.betterlapras.LaprasMoveCombat;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import net.minecraft.world.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,7 +14,7 @@ public class LaprasProjectileAttackMixin {
 	@Inject(method = "doHurtTarget", at = @At("HEAD"), cancellable = true)
 	private void betterlapras$laprasWaterGunInsteadOfMelee(Entity target, CallbackInfoReturnable<Boolean> cir) {
 		PokemonEntity self = (PokemonEntity) (Object) this;
-		if (LaprasProjectileCombat.tryReplaceMeleeWithProjectile(self, target)) {
+		if (LaprasMoveCombat.tryReplaceMeleeWithProjectile(self, target)) {
 			cir.setReturnValue(true);
 		}
 	}

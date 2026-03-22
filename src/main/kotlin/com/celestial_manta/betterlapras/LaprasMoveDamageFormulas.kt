@@ -1,10 +1,10 @@
 package com.celestial_manta.betterlapras
 
 /**
- * Per-[LaprasPulseKind] damage for BetterLapras ranged/melee-replaced pulses.
+ * Per-[LaprasPulseKind] strike damage for ranged volleys and melee-replaced shots.
  * Edit the private functions below to tune each move profile independently.
  */
-object LaprasPulseDamageFormulas {
+object LaprasMoveDamageFormulas {
 
 	fun compute(kind: LaprasPulseKind, pokemonLevel: Int): Double {
 		val level = pokemonLevel.coerceIn(1, 100)
@@ -24,13 +24,13 @@ object LaprasPulseDamageFormulas {
 		(2.0 + level * 0.35).coerceIn(2.0, 14.0)
 
 	private fun sheerCold(level: Int): Double =
-		(4.5 + level * 0.5).coerceIn(4.5, 22.0)
+		(10.0 + level * 0.75).coerceIn(10.0, 70.0)
 
 	private fun iceShard(level: Int): Double =
-		(1.0 + level * 0.28).coerceIn(1.0, 9.0)
+		(2.0 + level * 0.28).coerceIn(1.0, 12.0)
 
 	private fun hydroPump(level: Int): Double =
-		(2.2 + level * 0.32).coerceIn(2.2, 13.0)
+		(3.2 + level * 0.32).coerceIn(3.2, 23.0)
 
 	private fun bubbleBeamWater(level: Int): Double =
 		(0.85 + level * 0.22).coerceIn(0.85, 8.5)

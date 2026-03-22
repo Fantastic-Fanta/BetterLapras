@@ -1,6 +1,6 @@
 package com.celestial_manta.betterlapras.mixin;
 
-import com.celestial_manta.betterlapras.LaprasProjectileCombat;
+import com.celestial_manta.betterlapras.LaprasMoveCombat;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,6 +12,6 @@ public class LaprasRangedTickMixin {
 
 	@Inject(method = "tick", at = @At("TAIL"))
 	private void betterlapras$laprasRangedTick(CallbackInfo ci) {
-		LaprasProjectileCombat.tickRangedVolley((PokemonEntity) (Object) this);
+		LaprasMoveCombat.tickRangedVolley((PokemonEntity) (Object) this);
 	}
 }

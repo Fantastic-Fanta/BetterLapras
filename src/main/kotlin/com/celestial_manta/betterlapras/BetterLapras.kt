@@ -19,8 +19,8 @@ object BetterLapras : ModInitializer {
 						{
 							Component.literal(
 								"BetterLapras: owned Lapras in the Overworld fires Cobblemon-style pulses by slot-1 move; ranged distance is about "
-									+ LaprasProjectileCombat.RANGED_DISTANCE_HINT_MIN_BLOCKS.toInt() + "–"
-									+ LaprasProjectileCombat.RANGED_DISTANCE_HINT_MAX_BLOCKS.toInt()
+									+ LaprasMoveCombat.RANGED_DISTANCE_HINT_MIN_BLOCKS.toInt() + "–"
+									+ LaprasMoveCombat.RANGED_DISTANCE_HINT_MAX_BLOCKS.toInt()
 									+ " blocks depending on the move (plus point-blank when Cobblemon tries to melee).",
 							)
 						},
