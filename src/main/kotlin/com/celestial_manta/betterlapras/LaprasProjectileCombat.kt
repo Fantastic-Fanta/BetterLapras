@@ -1,7 +1,6 @@
 package com.celestial_manta.betterlapras
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
-import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormEntityParticlePacket
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
@@ -37,11 +36,6 @@ object LaprasProjectileCombat {
 
 	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
-
-	private val BEAM_SOURCE_LOCATORS: List<String> = listOf("special", "target")
-	private val BEAM_TARGET_LOCATORS: List<String> = listOf("target")
-
-	private const val WORLD_PULSE_RANGE = 128.0
 
 	/** Below this, only the melee ([doHurtTarget]) path typically runs; above [RANGED_MAX_DISTANCE], no shot. */
 	const val RANGED_MIN_DISTANCE = 4.0
@@ -141,34 +135,7 @@ object LaprasProjectileCombat {
 			ResourceLocation.fromNamespaceAndPath("cobblemon", pres.actorSoundPath),
 		)
 
-		if (profile.kind != LaprasPulseKind.HYDRO_PUMP) {
-			sendEntitySnowstormAround(
-				level,
-				SpawnSnowstormEntityParticlePacket(
-					pres.trailSuds,
-					attacker.id,
-					listOf("root"),
-					null,
-					emptyList(),
-				),
-				attacker.x,
-				attacker.y,
-				attacker.z,
-			)
-		}
-		sendEntitySnowstormAround(
-			level,
-			SpawnSnowstormEntityParticlePacket(
-				pres.trailActor,
-				attacker.id,
-				BEAM_SOURCE_LOCATORS,
-				target.id,
-				BEAM_TARGET_LOCATORS,
-			),
-			attacker.x,
-			attacker.y,
-			attacker.z,
-		)
+		// Beam VFX: one packet from [WaterPulseProjectile] on first tick only (was doubled here + every N ticks in-flight).
 
 		repeat(PULSE_COUNT) {
 			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage, profile)
@@ -224,16 +191,6 @@ object LaprasProjectileCombat {
 		pokemon.yHeadRotO = yRot
 		pokemon.yBodyRot = yRot
 		pokemon.yBodyRotO = yRot
-	}
-
-	private fun sendEntitySnowstormAround(
-		level: ServerLevel,
-		packet: SpawnSnowstormEntityParticlePacket,
-		ax: Double,
-		ay: Double,
-		az: Double,
-	) {
-		packet.sendToPlayersAround(ax, ay, az, WORLD_PULSE_RANGE, level.dimension()) { false }
 	}
 
 	private fun playCobblemonSound(level: ServerLevel, at: Vec3, soundId: ResourceLocation) {

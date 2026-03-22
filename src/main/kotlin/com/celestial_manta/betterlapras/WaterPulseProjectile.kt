@@ -3,7 +3,6 @@ package com.celestial_manta.betterlapras
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormEntityParticlePacket
 import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormParticlePacket
-import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
@@ -27,9 +26,8 @@ import net.minecraft.resources.ResourceLocation
 import kotlin.math.ceil
 
 /**
- * Travelling pulse using Cobblemon Water Pulse Snowstorm effects + move sounds.
- * Damage and target hit VFX are applied on a **scheduled server tick** so they line up with travel + beam visuals
- * (the entity does not deal damage on collision).
+ * Travelling pulse: **one** Cobblemon Lapras→target beam packet per shot ([PulsePresentation.trailPulseEffect]),
+ * sent on the first tick the owner + target resolve; hit uses a **single** world Snowstorm (no collision damage).
  */
 class WaterPulseProjectile(
 	type: EntityType<out WaterPulseProjectile>,
@@ -43,9 +41,10 @@ class WaterPulseProjectile(
 	private var presentation: PulsePresentation =
 		LaprasMoveShotProfiles.presentationForKind(LaprasPulseKind.WATER_DEFAULT)
 
-	private var trailCounter: Int = 0
+	/** True after the one-shot entity-linked beam VFX has been sent (persisted so reloads don’t re-fire). */
+	private var trailPulseEmitted: Boolean = false
 
-	/** Network id of the combat target; used to spawn world-space VFX on the target while the pulse flies. */
+	/** Network id of the combat target; used for entity-linked trail packets. */
 	private var beamTargetId: Int = 0
 
 	/** Server tick ([net.minecraft.server.MinecraftServer.tickCount]) when [deliverScheduledImpact] runs. */
@@ -68,10 +67,6 @@ class WaterPulseProjectile(
 		beamTargetId = target.id
 	}
 
-	/**
-	 * @param impactTick absolute server tick when damage + target hit effects apply
-	 * @param victimEntityId living target this pulse was aimed at
-	 */
 	fun setScheduledImpact(impactTick: Int, victimEntityId: Int) {
 		impactServerTick = impactTick
 		scheduledVictimEntityId = victimEntityId
@@ -88,6 +83,7 @@ class WaterPulseProjectile(
 		tag.putBoolean("BetterLaprasImpactDelivered", impactDelivered)
 		tag.putBoolean("BetterLaprasImpactCancelled", impactCancelled)
 		tag.putInt("BetterLaprasBeamTarget", beamTargetId)
+		tag.putBoolean("BetterLaprasTrailPulseEmitted", trailPulseEmitted)
 	}
 
 	override fun readAdditionalSaveData(tag: CompoundTag) {
@@ -113,6 +109,9 @@ class WaterPulseProjectile(
 		if (tag.contains("BetterLaprasBeamTarget")) {
 			beamTargetId = tag.getInt("BetterLaprasBeamTarget")
 		}
+		if (tag.contains("BetterLaprasTrailPulseEmitted")) {
+			trailPulseEmitted = tag.getBoolean("BetterLaprasTrailPulseEmitted")
+		}
 	}
 
 	override fun getDefaultGravity(): Double = 0.02
@@ -121,7 +120,6 @@ class WaterPulseProjectile(
 		if (!super.canHitEntity(entity)) return false
 		val owner = owner
 		if (owner != null && entity == owner) return false
-		// Scheduled hits: pass through entities; damage/VFX fire on [impactServerTick].
 		if (impactServerTick >= 0 && !impactCancelled) return false
 		return true
 	}
@@ -143,8 +141,6 @@ class WaterPulseProjectile(
 
 		super.tick()
 		val vec3 = deltaMovement
-		// Until the scheduled impact tick, ignore block/entity hits — otherwise we discard in [onHitBlock]
-		// before damage runs (entities are already ignored via [canHitEntity]).
 		if (!skipHitsUntilScheduledImpact) {
 			val hitResult = ProjectileUtil.getHitResultOnMoveVector(this) { canHitEntity(it) }
 			hitTargetOrDeflectSelf(hitResult)
@@ -167,81 +163,21 @@ class WaterPulseProjectile(
 		applyGravity()
 		setPos(x, y, z)
 
-		if (!level().isClientSide && level() is ServerLevel) {
-			trailCounter++
-			val pos = position()
-			// Cobblemon actor/suds/ring need entity-linked emitters (MoLang target_delta / q.entity_*); world-only = frozen.
-			when (pulseKind) {
-				LaprasPulseKind.HYDRO_PUMP -> {
-					broadcastVanillaWaterTrailHydro(pos, vec3)
-					broadcastEntityBeam()
-				}
-				LaprasPulseKind.OFF_TYPE_WATER -> {
-					if (trailCounter % BEAM_INTERVAL_TICKS == 0) {
-						broadcastEntityBeam()
-					}
-					if (trailCounter % SUDS_INTERVAL_TICKS == 0) {
-						broadcastEntitySudsOnOwner()
-					}
-					if (trailCounter % RING_INTERVAL_TICKS == 0) {
-						broadcastEntityRing()
-					}
-				}
-				else -> {
-					broadcastVanillaWaterTrail(pos, vec3)
-					if (trailCounter % BEAM_INTERVAL_TICKS == 0) {
-						broadcastEntityBeam()
-					}
-					if (trailCounter % SUDS_INTERVAL_TICKS == 0) {
-						broadcastEntitySudsOnOwner()
-					}
-					if (trailCounter % RING_INTERVAL_TICKS == 0) {
-						broadcastEntityRing()
-					}
-				}
+		if (!level().isClientSide && level() is ServerLevel && !trailPulseEmitted) {
+			when {
+				tryEmitTrailPulseOnce() -> trailPulseEmitted = true
+				beamTargetLostOrDead() -> trailPulseEmitted = true
 			}
 		}
 	}
 
-	private fun broadcastVanillaWaterTrail(pos: Vec3, motion: Vec3) {
-		val sl = level() as ServerLevel
-		val len = motion.length()
-		if (len < 1.0e-4) return
-		val spread = 0.12
-		sl.sendParticles(
-			ParticleTypes.SPLASH,
-			pos.x,
-			pos.y,
-			pos.z,
-			2,
-			spread,
-			spread * 0.5,
-			spread,
-			0.02,
-		)
-	}
-
-	/** Chunkier trail so Hydro Pump reads as a thick straight jet (same SPLASH type as default water). */
-	private fun broadcastVanillaWaterTrailHydro(pos: Vec3, motion: Vec3) {
-		val sl = level() as ServerLevel
-		val len = motion.length()
-		if (len < 1.0e-4) return
-		val spread = 0.38
-		sl.sendParticles(
-			ParticleTypes.SPLASH,
-			pos.x,
-			pos.y,
-			pos.z,
-			10,
-			spread * 0.35,
-			spread * 0.25,
-			spread * 0.35,
-			0.055,
-		)
+	private fun beamTargetLostOrDead(): Boolean {
+		if (beamTargetId == 0) return false
+		val t = level().getEntity(beamTargetId) ?: return true
+		return t !is LivingEntity || !t.isAlive
 	}
 
 	private fun spawnSnowstormWorld(effect: ResourceLocation, pos: Vec3, range: Double = WORLD_PARTICLE_RANGE) {
-		// Cobblemon: last arg is exclusionCondition — true skips that player; never exclude here.
 		SpawnSnowstormParticlePacket(effect, pos).sendToPlayersAround(
 			pos.x,
 			pos.y,
@@ -256,14 +192,15 @@ class WaterPulseProjectile(
 		packet.sendToPlayersAround(ax, ay, az, WORLD_PARTICLE_RANGE, sl.dimension()) { false }
 	}
 
-	private fun broadcastEntityBeam() {
-		val lapras = owner as? PokemonEntity ?: return
-		if (beamTargetId == 0) return
-		val tgt = level().getEntity(beamTargetId) ?: return
-		if (!tgt.isAlive || tgt !is LivingEntity) return
+	/** One-shot Cobblemon beam (Lapras special/target → target). Returns false if owner/target not ready yet. */
+	private fun tryEmitTrailPulseOnce(): Boolean {
+		val lapras = owner as? PokemonEntity ?: return false
+		if (beamTargetId == 0) return false
+		val tgt = level().getEntity(beamTargetId) ?: return false
+		if (!tgt.isAlive || tgt !is LivingEntity) return false
 		broadcastEntitySnowstorm(
 			SpawnSnowstormEntityParticlePacket(
-				presentation.trailActor,
+				presentation.trailPulseEffect,
 				lapras.id,
 				SOURCE_LOCATORS_BEAM,
 				tgt.id,
@@ -273,41 +210,7 @@ class WaterPulseProjectile(
 			lapras.y,
 			lapras.z,
 		)
-	}
-
-	private fun broadcastEntitySudsOnOwner() {
-		val lapras = owner as? PokemonEntity ?: return
-		broadcastEntitySnowstorm(
-			SpawnSnowstormEntityParticlePacket(
-				presentation.trailSuds,
-				lapras.id,
-				listOf("root"),
-				null,
-				emptyList(),
-			),
-			lapras.x,
-			lapras.y,
-			lapras.z,
-		)
-	}
-
-	private fun broadcastEntityRing() {
-		val lapras = owner as? PokemonEntity ?: return
-		if (beamTargetId == 0) return
-		val tgt = level().getEntity(beamTargetId) ?: return
-		if (!tgt.isAlive || tgt !is LivingEntity) return
-		broadcastEntitySnowstorm(
-			SpawnSnowstormEntityParticlePacket(
-				presentation.trailRing,
-				lapras.id,
-				SOURCE_LOCATORS_BEAM,
-				tgt.id,
-				TARGET_LOCATORS_BEAM,
-			),
-			lapras.x,
-			lapras.y,
-			lapras.z,
-		)
+		return true
 	}
 
 	override fun onHitEntity(entityHitResult: EntityHitResult) {
@@ -324,8 +227,7 @@ class WaterPulseProjectile(
 		if (!level().isClientSide && level() is ServerLevel) {
 			impactCancelled = true
 			val pos = Vec3.atCenterOf(blockHitResult.blockPos)
-			val blockRange = if (pulseKind == LaprasPulseKind.HYDRO_PUMP) HYDRO_HIT_PARTICLE_RANGE else 64.0
-			spawnSnowstormWorld(presentation.blockSplash, pos, blockRange)
+			spawnSnowstormWorld(presentation.blockSplash, pos, 64.0)
 			discard()
 		}
 	}
@@ -351,13 +253,8 @@ class WaterPulseProjectile(
 		}
 
 		val hitPos = victim.getEyePosition(1f)
-		val hitRange = if (pulseKind == LaprasPulseKind.HYDRO_PUMP) HYDRO_HIT_PARTICLE_RANGE else WORLD_PARTICLE_RANGE
-		spawnSnowstormWorld(presentation.targetEffect, hitPos, hitRange)
-		spawnSnowstormWorld(presentation.targetSplash, hitPos, hitRange)
-		if (pulseKind == LaprasPulseKind.HYDRO_PUMP) {
-			spawnSnowstormWorld(presentation.targetEffect, hitPos.add(0.08, 0.0, 0.0), hitRange)
-			spawnSnowstormWorld(presentation.targetSplash, hitPos.add(-0.06, 0.05, 0.0), hitRange)
-		}
+		// Single world Snowstorm on hit (was target + splash = two stacked beams/bursts).
+		spawnSnowstormWorld(presentation.targetEffect, hitPos)
 
 		val src: DamageSource = when (ownerEntity) {
 			is LivingEntity -> damageSources().thrown(this, ownerEntity)
@@ -381,25 +278,12 @@ class WaterPulseProjectile(
 		private val TARGET_LOCATORS_BEAM: List<String> = listOf("target")
 
 		private const val WORLD_PARTICLE_RANGE = 128.0
-		private const val HYDRO_HIT_PARTICLE_RANGE = 192.0
 
-		private const val BEAM_INTERVAL_TICKS = 2
-		private const val SUDS_INTERVAL_TICKS = 3
-		private const val RING_INTERVAL_TICKS = 4
-
-		/**
-		 * Extra ticks after geometric flight time so target VFX/damage align with the Cobblemon pulse
-		 * (~0.9s particle lifetime on `waterpulse_actor`).
-		 */
 		private const val IMPACT_PAD_TICKS: Int = 18
 
 		private const val MIN_TRAVEL_TICKS: Int = 4
 		private const val MAX_TRAVEL_TICKS: Int = 120
 
-		/**
-		 * Server ticks from fire until scheduled impact, from spawn point to target eye (rough straight-line
-		 * travel at [blocksPerTick]) plus [IMPACT_PAD_TICKS].
-		 */
 		fun computeImpactDelayTicks(
 			origin: Vec3,
 			targetEye: Vec3,
