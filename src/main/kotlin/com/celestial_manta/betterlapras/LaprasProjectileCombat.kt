@@ -26,12 +26,6 @@ object LaprasProjectileCombat {
 	/** 3 seconds between volleys (20 tps → 60 ticks). */
 	private const val COOLDOWN_TICKS = 60
 
-	/** Blocks per tick along the shot (higher = faster pulses). */
-	private const val PROJECTILE_SPEED = 7.25f
-
-	/** `Projectile.shoot` spread; higher = wider random cone per pulse. */
-	private const val INACCURACY = 3.5f
-
 	private const val PULSE_COUNT = 1
 
 	/** Applied after base damage from level ([BASE_PULSE_DAMAGE_MIN]–[BASE_PULSE_DAMAGE_MAX]). */
@@ -43,10 +37,6 @@ object LaprasProjectileCombat {
 
 	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
-
-	private val ACTOR_SOUND_ID: ResourceLocation = ResourceLocation.fromNamespaceAndPath("cobblemon", "move.waterpulse.actor")
-	private val ACTOR_SUDS_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_actorsuds")
-	private val ACTOR_ENTITY_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_actor")
 
 	private val BEAM_SOURCE_LOCATORS: List<String> = listOf("special", "target")
 	private val BEAM_TARGET_LOCATORS: List<String> = listOf("target")
@@ -72,10 +62,11 @@ object LaprasProjectileCombat {
 		val dist = entity.distanceToTargetHoriz(target)
 		if (dist < RANGED_MIN_DISTANCE || dist > RANGED_MAX_DISTANCE) return
 
+		val profile = LaprasMoveShotProfiles.resolveShotProfile(entity) ?: return
 		if (!tryConsumeCooldown(entity, level)) return
 
-		val perPulseDamage = pulseDamageForLevel(entity.pokemon.level)
-		fireVolley(level, entity, target, perPulseDamage)
+		val perPulseDamage = pulseDamageForLevel(entity.pokemon.level) * profile.damageMultiplier
+		fireVolley(level, entity, target, perPulseDamage, profile)
 	}
 
 	@JvmStatic
@@ -84,11 +75,13 @@ object LaprasProjectileCombat {
 		if (target !is LivingEntity || !target.isAlive) return false
 		if (!isLaprasProjectileContext(attacker)) return false
 
+		val profile = LaprasMoveShotProfiles.resolveShotProfile(attacker) ?: return false
+
 		val level = attacker.level() as? ServerLevel ?: return false
 		if (!tryConsumeCooldown(attacker, level)) return true
 
-		val perPulseDamage = pulseDamageForLevel(attacker.pokemon.level)
-		fireVolley(level, attacker, target, perPulseDamage)
+		val perPulseDamage = pulseDamageForLevel(attacker.pokemon.level) * profile.damageMultiplier
+		fireVolley(level, attacker, target, perPulseDamage, profile)
 		return true
 	}
 
@@ -126,6 +119,7 @@ object LaprasProjectileCombat {
 		attacker: PokemonEntity,
 		target: LivingEntity,
 		perPulseDamage: Double,
+		profile: LaprasShotProfile,
 	) {
 		orientPokemonTowardTarget(attacker, target)
 		// Cobblemon poser: battle poses map `special` → lapras `special` / surfacewater_special / water_special.
@@ -140,25 +134,32 @@ object LaprasProjectileCombat {
 		val spawnOrigin = eye.add(towardMouth.scale(MOUTH_OFFSET_ALONG_SHOT))
 		val aim = targetEye.subtract(spawnOrigin).normalize()
 
-		playCobblemonSound(level, spawnOrigin, ACTOR_SOUND_ID)
-
-		sendEntitySnowstormAround(
+		val pres = profile.presentation
+		playCobblemonSound(
 			level,
-			SpawnSnowstormEntityParticlePacket(
-				ACTOR_SUDS_EFFECT,
-				attacker.id,
-				listOf("root"),
-				null,
-				emptyList(),
-			),
-			attacker.x,
-			attacker.y,
-			attacker.z,
+			spawnOrigin,
+			ResourceLocation.fromNamespaceAndPath("cobblemon", pres.actorSoundPath),
 		)
+
+		if (profile.kind != LaprasPulseKind.HYDRO_PUMP) {
+			sendEntitySnowstormAround(
+				level,
+				SpawnSnowstormEntityParticlePacket(
+					pres.trailSuds,
+					attacker.id,
+					listOf("root"),
+					null,
+					emptyList(),
+				),
+				attacker.x,
+				attacker.y,
+				attacker.z,
+			)
+		}
 		sendEntitySnowstormAround(
 			level,
 			SpawnSnowstormEntityParticlePacket(
-				ACTOR_ENTITY_EFFECT,
+				pres.trailActor,
 				attacker.id,
 				BEAM_SOURCE_LOCATORS,
 				target.id,
@@ -170,7 +171,7 @@ object LaprasProjectileCombat {
 		)
 
 		repeat(PULSE_COUNT) {
-			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage)
+			fireOne(level, attacker, target, spawnOrigin, targetEye, aim, perPulseDamage, profile)
 		}
 	}
 
@@ -188,16 +189,24 @@ object LaprasProjectileCombat {
 		targetEye: Vec3,
 		dir: Vec3,
 		damage: Double,
+		profile: LaprasShotProfile,
 	) {
 		val pulse = WaterPulseProjectile(BetterLaprasEntities.WATER_PULSE, level)
 		pulse.setOwner(shooter)
 		pulse.setBeamTarget(target)
 		pulse.setPulseDamage(damage)
-		val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(origin, targetEye, PROJECTILE_SPEED)
+		pulse.setPulseStyle(profile.kind)
+		val speed = profile.projectileSpeed
+		val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(
+			origin,
+			targetEye,
+			speed,
+			profile.impactPadTicks,
+		)
 		pulse.setScheduledImpact(level.server.tickCount + delayTicks, target.id)
 		pulse.moveTo(origin.x, origin.y, origin.z, shooter.yRot, shooter.xRot)
 
-		pulse.shoot(dir.x, dir.y, dir.z, PROJECTILE_SPEED, INACCURACY)
+		pulse.shoot(dir.x, dir.y, dir.z, speed, profile.inaccuracy)
 		level.addFreshEntity(pulse)
 	}
 

@@ -39,6 +39,10 @@ class WaterPulseProjectile(
 	var pulseDamage: Double = 1.0
 		private set
 
+	private var pulseKind: LaprasPulseKind = LaprasPulseKind.WATER_DEFAULT
+	private var presentation: PulsePresentation =
+		LaprasMoveShotProfiles.presentationForKind(LaprasPulseKind.WATER_DEFAULT)
+
 	private var trailCounter: Int = 0
 
 	/** Network id of the combat target; used to spawn world-space VFX on the target while the pulse flies. */
@@ -52,6 +56,12 @@ class WaterPulseProjectile(
 
 	fun setPulseDamage(value: Double) {
 		pulseDamage = value
+	}
+
+	/** Visuals + hit sounds; persisted via [pulseKind] in NBT after chunk reload. */
+	fun setPulseStyle(kind: LaprasPulseKind) {
+		pulseKind = kind
+		presentation = LaprasMoveShotProfiles.presentationForKind(kind)
 	}
 
 	fun setBeamTarget(target: Entity) {
@@ -72,6 +82,7 @@ class WaterPulseProjectile(
 	override fun addAdditionalSaveData(tag: CompoundTag) {
 		super.addAdditionalSaveData(tag)
 		tag.putDouble("PulseDamage", pulseDamage)
+		tag.putInt("BetterLaprasPulseKind", pulseKind.ordinal)
 		tag.putInt("BetterLaprasImpactTick", impactServerTick)
 		tag.putInt("BetterLaprasVictimId", scheduledVictimEntityId)
 		tag.putBoolean("BetterLaprasImpactDelivered", impactDelivered)
@@ -83,6 +94,9 @@ class WaterPulseProjectile(
 		super.readAdditionalSaveData(tag)
 		if (tag.contains("PulseDamage")) {
 			pulseDamage = tag.getDouble("PulseDamage")
+		}
+		if (tag.contains("BetterLaprasPulseKind")) {
+			setPulseStyle(LaprasPulseKind.fromOrdinal(tag.getInt("BetterLaprasPulseKind")))
 		}
 		if (tag.contains("BetterLaprasImpactTick")) {
 			impactServerTick = tag.getInt("BetterLaprasImpactTick")
@@ -157,15 +171,34 @@ class WaterPulseProjectile(
 			trailCounter++
 			val pos = position()
 			// Cobblemon actor/suds/ring need entity-linked emitters (MoLang target_delta / q.entity_*); world-only = frozen.
-			broadcastVanillaWaterTrail(pos, vec3)
-			if (trailCounter % BEAM_INTERVAL_TICKS == 0) {
-				broadcastEntityBeam()
-			}
-			if (trailCounter % SUDS_INTERVAL_TICKS == 0) {
-				broadcastEntitySudsOnOwner()
-			}
-			if (trailCounter % RING_INTERVAL_TICKS == 0) {
-				broadcastEntityRing()
+			when (pulseKind) {
+				LaprasPulseKind.HYDRO_PUMP -> {
+					broadcastVanillaWaterTrailHydro(pos, vec3)
+					broadcastEntityBeam()
+				}
+				LaprasPulseKind.OFF_TYPE_WATER -> {
+					if (trailCounter % BEAM_INTERVAL_TICKS == 0) {
+						broadcastEntityBeam()
+					}
+					if (trailCounter % SUDS_INTERVAL_TICKS == 0) {
+						broadcastEntitySudsOnOwner()
+					}
+					if (trailCounter % RING_INTERVAL_TICKS == 0) {
+						broadcastEntityRing()
+					}
+				}
+				else -> {
+					broadcastVanillaWaterTrail(pos, vec3)
+					if (trailCounter % BEAM_INTERVAL_TICKS == 0) {
+						broadcastEntityBeam()
+					}
+					if (trailCounter % SUDS_INTERVAL_TICKS == 0) {
+						broadcastEntitySudsOnOwner()
+					}
+					if (trailCounter % RING_INTERVAL_TICKS == 0) {
+						broadcastEntityRing()
+					}
+				}
 			}
 		}
 	}
@@ -185,6 +218,25 @@ class WaterPulseProjectile(
 			spread * 0.5,
 			spread,
 			0.02,
+		)
+	}
+
+	/** Chunkier trail so Hydro Pump reads as a thick straight jet (same SPLASH type as default water). */
+	private fun broadcastVanillaWaterTrailHydro(pos: Vec3, motion: Vec3) {
+		val sl = level() as ServerLevel
+		val len = motion.length()
+		if (len < 1.0e-4) return
+		val spread = 0.38
+		sl.sendParticles(
+			ParticleTypes.SPLASH,
+			pos.x,
+			pos.y,
+			pos.z,
+			10,
+			spread * 0.35,
+			spread * 0.25,
+			spread * 0.35,
+			0.055,
 		)
 	}
 
@@ -211,7 +263,7 @@ class WaterPulseProjectile(
 		if (!tgt.isAlive || tgt !is LivingEntity) return
 		broadcastEntitySnowstorm(
 			SpawnSnowstormEntityParticlePacket(
-				TRAIL_ACTOR_EFFECT,
+				presentation.trailActor,
 				lapras.id,
 				SOURCE_LOCATORS_BEAM,
 				tgt.id,
@@ -227,7 +279,7 @@ class WaterPulseProjectile(
 		val lapras = owner as? PokemonEntity ?: return
 		broadcastEntitySnowstorm(
 			SpawnSnowstormEntityParticlePacket(
-				TRAIL_SUDS_EFFECT,
+				presentation.trailSuds,
 				lapras.id,
 				listOf("root"),
 				null,
@@ -246,7 +298,7 @@ class WaterPulseProjectile(
 		if (!tgt.isAlive || tgt !is LivingEntity) return
 		broadcastEntitySnowstorm(
 			SpawnSnowstormEntityParticlePacket(
-				TRAIL_RING_EFFECT,
+				presentation.trailRing,
 				lapras.id,
 				SOURCE_LOCATORS_BEAM,
 				tgt.id,
@@ -272,7 +324,8 @@ class WaterPulseProjectile(
 		if (!level().isClientSide && level() is ServerLevel) {
 			impactCancelled = true
 			val pos = Vec3.atCenterOf(blockHitResult.blockPos)
-			spawnSnowstormWorld(TARGET_SPLASH_EFFECT, pos, 64.0)
+			val blockRange = if (pulseKind == LaprasPulseKind.HYDRO_PUMP) HYDRO_HIT_PARTICLE_RANGE else 64.0
+			spawnSnowstormWorld(presentation.blockSplash, pos, blockRange)
 			discard()
 		}
 	}
@@ -292,11 +345,19 @@ class WaterPulseProjectile(
 	private fun applyHitToLiving(victim: LivingEntity, serverLevel: ServerLevel) {
 		val ownerEntity = owner
 
-		playCobblemonSound(serverLevel, victim.position(), SOUND_TARGET)
+		playCobblemonSound(serverLevel, victim.position(), presentation.targetSoundPathPrimary)
+		presentation.targetSoundPathSecondary?.let {
+			playCobblemonSound(serverLevel, victim.position(), it)
+		}
 
 		val hitPos = victim.getEyePosition(1f)
-		spawnSnowstormWorld(TARGET_EFFECT, hitPos)
-		spawnSnowstormWorld(TARGET_SPLASH_EFFECT, hitPos)
+		val hitRange = if (pulseKind == LaprasPulseKind.HYDRO_PUMP) HYDRO_HIT_PARTICLE_RANGE else WORLD_PARTICLE_RANGE
+		spawnSnowstormWorld(presentation.targetEffect, hitPos, hitRange)
+		spawnSnowstormWorld(presentation.targetSplash, hitPos, hitRange)
+		if (pulseKind == LaprasPulseKind.HYDRO_PUMP) {
+			spawnSnowstormWorld(presentation.targetEffect, hitPos.add(0.08, 0.0, 0.0), hitRange)
+			spawnSnowstormWorld(presentation.targetSplash, hitPos.add(-0.06, 0.05, 0.0), hitRange)
+		}
 
 		val src: DamageSource = when (ownerEntity) {
 			is LivingEntity -> damageSources().thrown(this, ownerEntity)
@@ -316,23 +377,15 @@ class WaterPulseProjectile(
 	}
 
 	companion object {
-		/** Same ids as [data/cobblemon/action_effects/moves/waterpulse.json] entity_particles. */
-		private val TRAIL_ACTOR_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_actor")
-		private val TRAIL_SUDS_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_actorsuds")
-		private val TRAIL_RING_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_actorring")
-		private val TARGET_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_target")
-		private val TARGET_SPLASH_EFFECT: ResourceLocation = ResourceLocation.parse("cobblemon:waterpulse_targetsplash")
-
 		private val SOURCE_LOCATORS_BEAM: List<String> = listOf("special", "target")
 		private val TARGET_LOCATORS_BEAM: List<String> = listOf("target")
 
 		private const val WORLD_PARTICLE_RANGE = 128.0
+		private const val HYDRO_HIT_PARTICLE_RANGE = 192.0
 
 		private const val BEAM_INTERVAL_TICKS = 2
 		private const val SUDS_INTERVAL_TICKS = 3
 		private const val RING_INTERVAL_TICKS = 4
-
-		private const val SOUND_TARGET = "move.waterpulse.target"
 
 		/**
 		 * Extra ticks after geometric flight time so target VFX/damage align with the Cobblemon pulse
@@ -347,18 +400,23 @@ class WaterPulseProjectile(
 		 * Server ticks from fire until scheduled impact, from spawn point to target eye (rough straight-line
 		 * travel at [blocksPerTick]) plus [IMPACT_PAD_TICKS].
 		 */
-		fun computeImpactDelayTicks(origin: Vec3, targetEye: Vec3, blocksPerTick: Float): Int {
+		fun computeImpactDelayTicks(
+			origin: Vec3,
+			targetEye: Vec3,
+			blocksPerTick: Float,
+			impactPadTicks: Int = IMPACT_PAD_TICKS,
+		): Int {
 			val dist = origin.distanceTo(targetEye)
 			val travel = ceil(dist / blocksPerTick.toDouble()).toInt()
-			return travel.coerceIn(MIN_TRAVEL_TICKS, MAX_TRAVEL_TICKS) + IMPACT_PAD_TICKS
+			return travel.coerceIn(MIN_TRAVEL_TICKS, MAX_TRAVEL_TICKS) + impactPadTicks
 		}
+	}
 
-		private fun playCobblemonSound(level: ServerLevel, at: Vec3, path: String) {
-			val id = ResourceLocation.fromNamespaceAndPath("cobblemon", path)
-			val soundEvent: SoundEvent? = BuiltInRegistries.SOUND_EVENT.get(id)
-			if (soundEvent != null) {
-				level.playSound(null, at.x, at.y, at.z, soundEvent, SoundSource.NEUTRAL, 0.85f, 1.0f)
-			}
+	private fun playCobblemonSound(level: ServerLevel, at: Vec3, path: String) {
+		val id = ResourceLocation.fromNamespaceAndPath("cobblemon", path)
+		val soundEvent: SoundEvent? = BuiltInRegistries.SOUND_EVENT.get(id)
+		if (soundEvent != null) {
+			level.playSound(null, at.x, at.y, at.z, soundEvent, SoundSource.NEUTRAL, 0.85f, 1.0f)
 		}
 	}
 }
