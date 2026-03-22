@@ -155,6 +155,9 @@ class WaterPulseProjectile(
 		if (!skipHitsUntilScheduledImpact &&
 			level().getBlockStates(boundingBox).noneMatch { obj: BlockBehaviour.BlockStateBase -> obj.isAir }
 		) {
+			if (pulseKind == LaprasPulseKind.ICE_BEAM) {
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
+			}
 			discard()
 			return
 		}
@@ -169,6 +172,11 @@ class WaterPulseProjectile(
 				beamTargetLostOrDead() -> trailPulseEmitted = true
 			}
 		}
+	}
+
+	private fun iceSlownessAppliesNow(): Boolean {
+		if (pulseKind != LaprasPulseKind.ICE_BEAM) return false
+		return (owner as? PokemonEntity)?.slot1MoveIsIceType() == true
 	}
 
 	private fun beamTargetLostOrDead(): Boolean {
@@ -226,6 +234,9 @@ class WaterPulseProjectile(
 		super.onHitBlock(blockHitResult)
 		if (!level().isClientSide && level() is ServerLevel) {
 			impactCancelled = true
+			if (iceSlownessAppliesNow()) {
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
+			}
 			val pos = Vec3.atCenterOf(blockHitResult.blockPos)
 			spawnSnowstormWorld(presentation.blockSplash, pos, 64.0)
 			discard()
@@ -237,6 +248,9 @@ class WaterPulseProjectile(
 		impactDelivered = true
 		val victim = serverLevel.getEntity(scheduledVictimEntityId) as? LivingEntity
 		if (victim == null || !victim.isAlive) {
+			if (pulseKind == LaprasPulseKind.ICE_BEAM) {
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(serverLevel.getEntity(beamTargetId) as? LivingEntity)
+			}
 			discard()
 			return
 		}
@@ -262,6 +276,10 @@ class WaterPulseProjectile(
 		}
 		if (victim.hurt(src, pulseDamage.toFloat())) {
 			EnchantmentHelper.doPostAttackEffects(serverLevel, victim, src)
+		}
+
+		if (iceSlownessAppliesNow()) {
+			LaprasIceBeamEffects.applyPostHitSlow(victim)
 		}
 	}
 

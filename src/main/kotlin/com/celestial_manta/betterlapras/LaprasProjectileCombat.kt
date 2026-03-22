@@ -116,8 +116,6 @@ object LaprasProjectileCombat {
 		profile: LaprasShotProfile,
 	) {
 		orientPokemonTowardTarget(attacker, target)
-		// Cobblemon poser: battle poses map `special` → lapras `special` / surfacewater_special / water_special.
-		attacker.playAnimation("special", listOf())
 
 		val eye = attacker.getEyePosition(1f)
 		val targetEye = target.getEyePosition(1f)
@@ -127,6 +125,19 @@ object LaprasProjectileCombat {
 		val towardMouth = toTarget.normalize()
 		val spawnOrigin = eye.add(towardMouth.scale(MOUTH_OFFSET_ALONG_SHOT))
 		val aim = targetEye.subtract(spawnOrigin).normalize()
+
+		if (profile.kind == LaprasPulseKind.ICE_BEAM && attacker.slot1MoveIsIceType()) {
+			val delayTicks = WaterPulseProjectile.computeImpactDelayTicks(
+				spawnOrigin,
+				targetEye,
+				profile.projectileSpeed,
+				profile.impactPadTicks,
+			)
+			LaprasIceBeamEffects.applyPreBeamFreeze(target, delayTicks)
+		}
+
+		// Cobblemon poser: battle poses map `special` → lapras `special` / surfacewater_special / water_special.
+		attacker.playAnimation("special", listOf())
 
 		val pres = profile.presentation
 		playCobblemonSound(

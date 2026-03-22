@@ -111,20 +111,21 @@ object LaprasMoveShotProfiles {
 			)
 		}
 
-		if (move.type == ElementalTypes.ICE) {
+		// Water before ice so slot-1 water moves never resolve as ice (slowness / VFX stay water-only).
+		if (move.type == ElementalTypes.WATER) {
 			return LaprasShotProfile(
-				kind = LaprasPulseKind.ICE_BEAM,
-				presentation = ICE_BEAM_PRESENTATION,
+				kind = LaprasPulseKind.WATER_DEFAULT,
+				presentation = WATER_PULSE_PRESENTATION,
 				projectileSpeed = DEFAULT_PROJECTILE_SPEED,
 				inaccuracy = DEFAULT_INACCURACY,
 				damageMultiplier = 1.0,
 			)
 		}
 
-		if (move.type == ElementalTypes.WATER) {
+		if (move.type == ElementalTypes.ICE) {
 			return LaprasShotProfile(
-				kind = LaprasPulseKind.WATER_DEFAULT,
-				presentation = WATER_PULSE_PRESENTATION,
+				kind = LaprasPulseKind.ICE_BEAM,
+				presentation = ICE_BEAM_PRESENTATION,
 				projectileSpeed = DEFAULT_PROJECTILE_SPEED,
 				inaccuracy = DEFAULT_INACCURACY,
 				damageMultiplier = 1.0,
