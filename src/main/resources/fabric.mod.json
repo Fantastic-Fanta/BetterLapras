@@ -38,5 +38,10 @@
 		"fabric-api": "*",
 		"fabric-language-kotlin": "*",
 		"cobblemon": ">=1.7.3"
+	},
+	"custom": {
+		"fabric:resource_load_order": {
+			"after": ["cobblemon"]
+		}
 	}
 }
