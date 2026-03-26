@@ -191,7 +191,10 @@ class LaprasMoveProjectile(
 			level().getBlockStates(boundingBox).noneMatch { obj: BlockBehaviour.BlockStateBase -> obj.isAir }
 		) {
 			if (shouldClearPreBeamFreezeOnMiss()) {
-				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(
+					level().getEntity(beamTargetId) as? LivingEntity,
+					owner as? LivingEntity,
+				)
 			}
 			discard()
 			return
@@ -276,7 +279,10 @@ class LaprasMoveProjectile(
 		if (!level().isClientSide && level() is ServerLevel) {
 			impactCancelled = true
 			if (shouldClearPreBeamFreezeOnMiss()) {
-				LaprasIceBeamEffects.clearHeavySlownessFromMiss(level().getEntity(beamTargetId) as? LivingEntity)
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(
+					level().getEntity(beamTargetId) as? LivingEntity,
+					owner as? LivingEntity,
+				)
 			}
 			val pos = Vec3.atCenterOf(blockHitResult.blockPos)
 			spawnSnowstormWorld(presentation.blockSplash, pos, 64.0)
@@ -290,7 +296,10 @@ class LaprasMoveProjectile(
 		val victim = serverLevel.getEntity(scheduledVictimEntityId) as? LivingEntity
 		if (victim == null || !victim.isAlive) {
 			if (shouldClearPreBeamFreezeOnMiss()) {
-				LaprasIceBeamEffects.clearHeavySlownessFromMiss(serverLevel.getEntity(beamTargetId) as? LivingEntity)
+				LaprasIceBeamEffects.clearHeavySlownessFromMiss(
+					serverLevel.getEntity(beamTargetId) as? LivingEntity,
+					owner as? LivingEntity,
+				)
 			}
 			discard()
 			return
@@ -379,6 +388,9 @@ class LaprasMoveProjectile(
 			EnchantmentHelper.doPostAttackEffects(serverLevel, victim, src)
 		}
 
+		if (moveProfileKind == LaprasPulseKind.ICE_BEAM_MOVE) {
+			LaprasIceBeamEffects.clearPreBeamSelfSlow(ownerEntity as? LivingEntity)
+		}
 		if (shouldApplyPostHitIceSlow()) {
 			LaprasIceBeamEffects.applyPostHitSlow(victim)
 		}

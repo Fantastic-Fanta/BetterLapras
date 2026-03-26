@@ -133,7 +133,7 @@ object LaprasMoveCombat {
 				profile.projectileSpeed,
 				profile.impactPadTicks,
 			)
-			LaprasIceBeamEffects.applyPreBeamFreeze(target, delayTicks)
+			LaprasIceBeamEffects.applyPreBeamFreeze(target, delayTicks, attacker)
 		}
 
 		attacker.playAnimation("special", listOf())
