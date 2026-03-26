@@ -8,6 +8,7 @@ object BetterLapras : ModInitializer {
 
 	override fun onInitialize() {
 		BetterLaprasSounds.register()
+		BetterLaprasParticles.register()
 		BetterLaprasEntities.register()
 		PerishSongHandler.register()
 

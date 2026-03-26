@@ -1,9 +1,14 @@
 package com.celestial_manta.betterlapras
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents
 import net.minecraft.core.Holder
+import net.minecraft.core.registries.Registries
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.tags.TagKey
+import net.minecraft.world.entity.EntityType
 import net.minecraft.network.chat.PlayerChatMessage
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.server.level.ServerLevel
@@ -14,22 +19,30 @@ import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.Mob
+import net.minecraft.world.entity.MobCategory
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Chat phrase "Lapras, use Perish Song" snapshots a center and marks every [LivingEntity] within
- * [MARK_RADIUS] once (no one who enters later is added). Marked targets get glowing + Slowness II;
+ * Chat: same message must contain "Lapras" and "Perish song" (case-insensitive, loose wording).
+ * That snapshots a center and marks every [LivingEntity] within
+ * [MARK_RADIUS] once (no one who enters later is added): [ServerPlayer]s, vanilla [MobCategory.MONSTER]
+ * mobs, and types in tag [HOSTILE_ENTITY_TAG] — never Cobblemon [PokemonEntity]. Marked targets get glowing + Slowness II;
  * players in that initial set hear the custom sting. Leaving [MARK_RADIUS] removes them from the
  * mark list and strips glowing, slowness, darkness, and nausea. At each of the first three milestones
  * (0s / 10s / 20s), marked targets still in range get a darkness pulse and the focal Lapras cry
  * animation; from 20s marked targets get
  * stronger nausea, then after 5s stronger still until 30s; remaining marked entities die. Focal Lapras
- * is never marked.
+ * is never marked. While the song runs, end rod particles form a horizontal ring around the focal
+ * Lapras with two concentric rings (opposite transverse wave phase) and forced particle visibility.
+ * When a marked target dies (including resolve), an end rod burst plays at its position.
  */
 object PerishSongHandler {
 	private const val TPS = 20
@@ -57,6 +70,25 @@ object PerishSongHandler {
 	/** Darkness duration per warning milestone (~3 s). */
 	private const val DARKNESS_WARNING_TICKS = 3 * TPS
 
+	/** End rod rings around focal Lapras during Perish Song (XZ circle, Y = transverse displacement). */
+	private const val PERISH_RING_RADIUS_INNER = 2.25
+	private const val PERISH_RING_RADIUS_OUTER = 3.2
+	private const val PERISH_RING_SEGMENTS = 48
+	private const val PERISH_WAVE_PEAKS_AROUND_RING = 4.0
+	private const val PERISH_WAVE_AMP_BLOCKS = 0.42
+	private const val PERISH_RING_Y_OFFSET = 1.05
+	/** Phase advance per game tick (wave propagation around the ring). */
+	private const val PERISH_WAVE_PHASE_PER_TICK = 0.18
+
+	/** Extra entity types that count as hostile for Perish Song (datapack-extendable). */
+	private val HOSTILE_ENTITY_TAG: TagKey<EntityType<*>> = TagKey.create(
+		Registries.ENTITY_TYPE,
+		ResourceLocation.fromNamespaceAndPath("betterlapras", "hostile"),
+	)
+
+	private const val DEATH_BURST_PARTICLES = 36
+	private const val DEATH_BURST_SPREAD = 0.9
+
 	private val sessions = Collections.synchronizedList(mutableListOf<Session>())
 	private val lastTriggerGameTick = ConcurrentHashMap<UUID, Int>()
 
@@ -79,11 +111,26 @@ object PerishSongHandler {
 				tickWorld(world)
 			}
 		}
+		ServerLivingEntityEvents.AFTER_DEATH.register { entity, _ ->
+			val level = entity.level()
+			if (level !is ServerLevel) return@register
+			val pos = entity.position()
+			val uuid = entity.uuid
+			synchronized(sessions) {
+				for (session in sessions) {
+					if (session.level !== level) continue
+					if (uuid != session.focalLaprasUuid && uuid in session.marked) {
+						spawnEndRodBurst(level, pos)
+						break
+					}
+				}
+			}
+		}
 	}
 
 	private fun onChat(sender: ServerPlayer, message: PlayerChatMessage) {
 		val plain = normalizePhrase(message.decoratedContent().string)
-		if (plain != TRIGGER_PHRASE) return
+		if (!matchesPerishSongChat(plain)) return
 
 		val level = sender.serverLevel()
 		val now = level.server.tickCount
@@ -108,6 +155,7 @@ object PerishSongHandler {
 
 	private fun tickWorld(level: ServerLevel) {
 		anchorFocalLapras(level)
+		tickPerishSongParticles(level)
 		val tick = level.server.tickCount
 		synchronized(sessions) {
 			val iter = sessions.iterator()
@@ -132,6 +180,56 @@ object PerishSongHandler {
 					iter.remove()
 				}
 			}
+		}
+	}
+
+	/**
+	 * Two concentric rings in the XZ plane; vertical offset is a sine in [theta] ± phase (outer uses
+	 * opposite sign so the wave runs the other way). [sendPerishSongParticleForce] uses always-visible
+	 * particles (override distance limiter).
+	 */
+	private fun tickPerishSongParticles(level: ServerLevel) {
+		val t = level.gameTime.toDouble()
+		synchronized(sessions) {
+			for (session in sessions) {
+				if (session.level !== level) continue
+				val c = session.center
+				val phase = t * PERISH_WAVE_PHASE_PER_TICK
+				val n = PERISH_RING_SEGMENTS
+				val rings = arrayOf(
+					Pair(PERISH_RING_RADIUS_INNER, 1.0),
+					Pair(PERISH_RING_RADIUS_OUTER, -1.0),
+				)
+				for (i in 0 until n) {
+					val theta = (i / n.toDouble()) * 2.0 * PI
+					for ((radius, phaseSign) in rings) {
+						val x = c.x + radius * cos(theta)
+						val z = c.z + radius * sin(theta)
+						val y = c.y + PERISH_RING_Y_OFFSET +
+							PERISH_WAVE_AMP_BLOCKS * sin(
+								PERISH_WAVE_PEAKS_AROUND_RING * theta + phaseSign * phase,
+							)
+						sendPerishSongParticleForce(level, x, y, z)
+					}
+				}
+			}
+		}
+	}
+
+	private fun sendPerishSongParticleForce(level: ServerLevel, x: Double, y: Double, z: Double) {
+		val particle = BetterLaprasParticles.PERISH_SONG_END_ROD
+		for (player in level.players()) {
+			level.sendParticles(player, particle, true, x, y, z, 1, 0.0, 0.0, 0.0, 0.0)
+		}
+	}
+
+	private fun spawnEndRodBurst(level: ServerLevel, pos: Vec3) {
+		val r = level.random
+		repeat(DEATH_BURST_PARTICLES) {
+			val ox = (r.nextDouble() - 0.5) * 2.0 * DEATH_BURST_SPREAD
+			val oy = (r.nextDouble() - 0.5) * 2.0 * DEATH_BURST_SPREAD
+			val oz = (r.nextDouble() - 0.5) * 2.0 * DEATH_BURST_SPREAD
+			sendPerishSongParticleForce(level, pos.x + ox, pos.y + oy + 0.4, pos.z + oz)
 		}
 	}
 
@@ -249,11 +347,22 @@ object PerishSongHandler {
 		val out = mutableSetOf<UUID>()
 		for (entity in level.getEntitiesOfClass(LivingEntity::class.java, box)) {
 			if (entity.uuid == excludeUuid) continue
-			if (entity.position().distanceToSqr(center) <= markRadiusSq) {
-				out.add(entity.uuid)
-			}
+			if (entity.position().distanceToSqr(center) > markRadiusSq) continue
+			if (!isPerishSongTarget(entity)) continue
+			out.add(entity.uuid)
 		}
 		return out
+	}
+
+	/**
+	 * Players, vanilla [MobCategory.MONSTER] mobs, and [HOSTILE_ENTITY_TAG]; never other Pokémon.
+	 */
+	private fun isPerishSongTarget(entity: LivingEntity): Boolean {
+		if (entity is ServerPlayer) return true
+		if (entity is PokemonEntity) return false
+		val t = entity.type
+		if (t.`is`(HOSTILE_ENTITY_TAG)) return true
+		return t.category == MobCategory.MONSTER
 	}
 
 	private fun findNearestOwnedLapras(player: ServerPlayer): PokemonEntity? {
@@ -277,5 +386,7 @@ object PerishSongHandler {
 	private fun normalizePhrase(s: String): String =
 		s.trim().lowercase().replace(Regex("\\s+"), " ")
 
-	private const val TRIGGER_PHRASE = "lapras, use perish song"
+	/** True if the normalized chat line contains both "lapras" and "perish song" (same message). */
+	private fun matchesPerishSongChat(normalized: String): Boolean =
+		normalized.contains("lapras") && normalized.contains("perish song")
 }
