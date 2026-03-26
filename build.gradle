@@ -17,6 +17,20 @@ repositories {
 	// Cobblemon + common transitive mods (GeckoLib, etc.)
 	maven { url = "https://maven.impactdev.net/repository/development/" }
 	maven { url = "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/" }
+	mavenCentral()
+	maven { url = "https://maven.architectury.dev/" }
+	maven { url = "https://maven.shedaniel.me/releases" }
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = "Modrinth"
+				url = "https://api.modrinth.com/maven"
+			}
+		}
+		filter {
+			includeGroup "maven.modrinth"
+		}
+	}
 }
 
 loom {
@@ -43,6 +57,13 @@ dependencies {
 
 	// Full Cobblemon JAR for compile + runClient; players still install Cobblemon separately (not bundled in your jar).
 	modImplementation "com.cobblemon:fabric:${project.cobblemon_version}"
+
+	// Cobbreeding: compile + dev runtime only (not packaged into the BetterLapras jar).
+	modCompileOnly "maven.modrinth:cobbreeding:${cobbreeding_version}"
+	modRuntimeOnly "maven.modrinth:cobbreeding:${cobbreeding_version}"
+	// Declared by Cobbreeding; required on classpath when Cobbreeding is present (e.g. runClient).
+	modRuntimeOnly "dev.architectury:architectury-fabric:${architectury_version}"
+	modRuntimeOnly "me.shedaniel.cloth:cloth-config-fabric:${cloth_config_version}"
 }
 
 processResources {

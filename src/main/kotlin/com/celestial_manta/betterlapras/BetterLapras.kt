@@ -1,6 +1,8 @@
 package com.celestial_manta.betterlapras
 
+import com.celestial_manta.betterlapras.compat.CobbreedingEggCommands
 import net.fabricmc.api.ModInitializer
+import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.LoggerFactory
 
 object BetterLapras : ModInitializer {
@@ -11,6 +13,11 @@ object BetterLapras : ModInitializer {
 		BetterLaprasParticles.register()
 		BetterLaprasEntities.register()
 		PerishSongHandler.register()
+
+		if (FabricLoader.getInstance().isModLoaded("cobbreeding")) {
+			CobbreedingEggCommands.register()
+			logger.info("Cobbreeding detected: registered /lapras egg commands")
+		}
 
 		logger.info("BetterLapras loaded")
 	}

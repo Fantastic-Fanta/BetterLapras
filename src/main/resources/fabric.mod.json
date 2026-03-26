@@ -39,6 +39,9 @@
 		"fabric-language-kotlin": "*",
 		"cobblemon": ">=1.7.3"
 	},
+	"suggests": {
+		"cobbreeding": ">=2.1.0"
+	},
 	"custom": {
 		"fabric:resource_load_order": {
 			"after": ["cobblemon"]
