@@ -1,0 +1,11 @@
+{
+	"perishsong": {
+		"sounds": [
+			{
+				"name": "betterlapras:perishsong",
+				"stream": false,
+				"volume": 1.0
+			}
+		]
+	}
+}

@@ -7,6 +7,7 @@ object BetterLapras : ModInitializer {
 	private val logger = LoggerFactory.getLogger("betterlapras")
 
 	override fun onInitialize() {
+		BetterLaprasSounds.register()
 		BetterLaprasEntities.register()
 		PerishSongHandler.register()
 
