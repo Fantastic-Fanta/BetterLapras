@@ -1,9 +1,6 @@
 package com.celestial_manta.betterlapras
 
 import net.fabricmc.api.ModInitializer
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-import net.minecraft.commands.Commands
-import net.minecraft.network.chat.Component
 import org.slf4j.LoggerFactory
 
 object BetterLapras : ModInitializer {
@@ -11,25 +8,7 @@ object BetterLapras : ModInitializer {
 
 	override fun onInitialize() {
 		BetterLaprasEntities.register()
-
-		CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-			dispatcher.register(
-				Commands.literal("betterlapras").executes { ctx ->
-					ctx.source.sendSuccess(
-						{
-							Component.literal(
-								"BetterLapras: owned Lapras in the Overworld fires Cobblemon-style pulses by slot-1 move; ranged distance is about "
-									+ LaprasMoveCombat.RANGED_DISTANCE_HINT_MIN_BLOCKS.toInt() + "–"
-									+ LaprasMoveCombat.RANGED_DISTANCE_HINT_MAX_BLOCKS.toInt()
-									+ " blocks depending on the move (plus point-blank when Cobblemon tries to melee).",
-							)
-						},
-						false,
-					)
-					1
-				},
-			)
-		}
+		PerishSongHandler.register()
 
 		logger.info("BetterLapras loaded")
 	}

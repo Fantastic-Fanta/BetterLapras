@@ -23,8 +23,7 @@
   "animations": {
     "cry": "q.bedrock_stateful('lapras', 'cry')",
     "recoil": "q.bedrock_stateful('lapras', 'recoil')",
-    "status": "q.bedrock_primary('lapras', 'status', q.curve('symmetrical_wide'))",
-    "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))"
+    "special": "q.bedrock_stateful('lapras', 'special')"
   },
   "poses": {
     "battle-standing": {
@@ -33,8 +32,7 @@
       "isTouchingWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_primary('lapras', 'battle_cry', q.curve('symmetrical_wide'))",
-        "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))"
       },
       "animations": ["q.look('head')", "q.bedrock('lapras', 'ground_idle')"],
       "quirks": ["q.bedrock_quirk('lapras', 'blink')"]
@@ -46,8 +44,7 @@
       "isUnderWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_primary('lapras', 'surfacewater_battle_cry', q.curve('symmetrical_wide'))",
-        "special": "q.bedrock_primary('lapras', 'surfacewater_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'surfacewater_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_primary('lapras', 'surfacewater_special', q.curve('symmetrical_wide'))"
       },
       "animations": [
         "q.look('head')",
@@ -62,8 +59,7 @@
       "isUnderWater": true,
       "namedAnimations": {
         "cry": "q.bedrock_primary('lapras', 'water_battle_cry', q.curve('symmetrical_wide'))",
-        "special": "q.bedrock_primary('lapras', 'water_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'water_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_primary('lapras', 'water_special', q.curve('symmetrical_wide'))"
       },
       "animations": ["q.look('head')", "q.bedrock('lapras', 'water_idle')"],
       "quirks": ["q.bedrock_quirk('lapras', 'blink')"]
@@ -74,8 +70,7 @@
       "isTouchingWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'special')"
       },
       "animations": [
         "q.look('head')",
@@ -95,8 +90,7 @@
       "isTouchingWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'special')"
       },
       "animations": [
         "q.look('head')",
@@ -114,8 +108,7 @@
       "isTouchingWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'surfacewater_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'surfacewater_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'surfacewater_special')"
       },
       "animations": [
         "q.look('head')",
@@ -129,8 +122,7 @@
       "condition": "q.in_air",
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'special')"
       },
       "animations": [
         "q.look('head')",
@@ -145,8 +137,7 @@
       "isUnderWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'surfacewater_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'surfacewater_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'surfacewater_special')"
       },
       "animations": [
         "q.look('head')",
@@ -173,8 +164,7 @@
       "isUnderWater": true,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'water_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'water_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'water_special')"
       },
       "animations": [
         "q.look('head')",
@@ -191,8 +181,7 @@
       "isUnderWater": false,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'surfacewater_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'surfacewater_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'surfacewater_special')"
       },
       "animations": [
         "q.look('head')",
@@ -219,8 +208,7 @@
       "isUnderWater": true,
       "namedAnimations": {
         "cry": "q.bedrock_stateful('lapras', 'cry')",
-        "special": "q.bedrock_primary('lapras', 'water_special', q.curve('symmetrical_wide'))",
-        "status": "q.bedrock_primary('lapras', 'water_status', q.curve('symmetrical_wide'))"
+        "special": "q.bedrock_stateful('lapras', 'water_special')"
       },
       "animations": [
         "q.look('head')",

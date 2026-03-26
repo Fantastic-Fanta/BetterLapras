@@ -92,7 +92,7 @@ object LaprasSlot1SupportMoves {
 	}
 
 	private fun activateSing(entity: PokemonEntity, level: ServerLevel) {
-		LaprasPosableAnimationPackets.broadcastLaprasCryPose(entity)
+		LaprasPosableAnimationPackets.broadcastLaprasSing(entity)
 		playSound(level, entity.position(), "move.sing.actor")
 		val singLocators = listOf("mouth", "jaw_lower", "special", "target")
 		broadcastSnowstorm(
@@ -148,7 +148,6 @@ object LaprasSlot1SupportMoves {
 	}
 
 	private fun activateMistFamily(entity: PokemonEntity, level: ServerLevel, owner: ServerPlayer) {
-		LaprasPosableAnimationPackets.broadcastLaprasStatusMove(entity)
 		playSound(level, entity.position(), "move.mist.actor")
 		broadcastSnowstorm(
 			level,

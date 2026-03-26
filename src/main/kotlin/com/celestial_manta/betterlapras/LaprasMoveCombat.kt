@@ -18,7 +18,7 @@ import kotlin.math.sqrt
 
 /**
  * Lapras overworld move strikes: Cobblemon Snowstorm VFX + sounds + [LaprasMoveProjectile] spawn.
- * Ranged gates use [LaprasShotProfile.rangedMinBlocks] / [LaprasShotProfile.rangedMaxBlocks]; see [RANGED_DISTANCE_HINT_*] for `/betterlapras` text.
+ * Ranged gates use [LaprasShotProfile.rangedMinBlocks] / [LaprasShotProfile.rangedMaxBlocks]; see [RANGED_DISTANCE_HINT_*] for approximate distance bands.
  * Melee: [doHurtTarget] mixin may replace with a move strike (shared cooldown).
  */
 object LaprasMoveCombat {
