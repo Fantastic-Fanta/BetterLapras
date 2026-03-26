@@ -3,51 +3,59 @@ package com.celestial_manta.betterlapras
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents
+import net.minecraft.core.Holder
 import net.minecraft.network.chat.PlayerChatMessage
+import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.sounds.SoundEvent
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
 import net.minecraft.world.entity.LivingEntity
-import net.minecraft.util.Mth
+import net.minecraft.world.entity.Mob
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.max
+import kotlin.math.sqrt
 
 /**
- * Chat phrase "Lapras, use Perish Song" triggers a fixed world-space sphere (20 blocks) at the
- * nearest owned Lapras position at trigger time; darkness warnings at 0s / 10s / 20s,
- * custom [BetterLaprasSounds.PERISH_SONG] + Lapras cry on the first warning; from 25s–29s nausea (Confusion)
- * ramps amplifier 1→20; kill at 30s. [LivingEntity] in the sphere are targeted (Lapras never marked).
+ * Chat phrase "Lapras, use Perish Song" snapshots a center and marks every [LivingEntity] within
+ * [MARK_RADIUS] once (no one who enters later is added). Marked targets get glowing + Slowness II;
+ * players in that initial set hear the custom sting. Leaving [MARK_RADIUS] removes them from the
+ * mark list and strips glowing, slowness, darkness, and nausea. At each of the first three milestones
+ * (0s / 10s / 20s), marked targets still in range get a darkness pulse and the focal Lapras cry
+ * animation; from 20s marked targets get
+ * stronger nausea, then after 5s stronger still until 30s; remaining marked entities die. Focal Lapras
+ * is never marked.
  */
 object PerishSongHandler {
-	private const val RADIUS = 20.0
-	private val radiusSq: Double = RADIUS * RADIUS
-
 	private const val TPS = 20
 
-	/** Warnings at 0s, 10s, 20s; kill at 30s. */
+	/** Initial mark and ongoing range check: leave this cylinder/sphere and you drop off the list. */
+	private const val MARK_RADIUS = 50.0
+	private val markRadiusSq: Double = MARK_RADIUS * MARK_RADIUS
+
+	/** Warnings at 0s, 10s, 20s (each applies darkness to marked targets); resolve at 30s. */
 	private val eventOffsetsTicks = intArrayOf(0, 10 * TPS, 20 * TPS, 30 * TPS)
 
 	private const val COOLDOWN_TICKS = 30 * TPS
 
 	private const val SEARCH_PAD = 256.0
 
-	/** Darkness duration per warning (~3 s). */
-	private const val DARKNESS_WARNING_TICKS = 3 * 20
+	/** Third milestone (index 2): nausea V from here… */
+	private const val THIRD_WARNING_TICKS = 20 * TPS
 
-	/** Living entities within this padding of [center] receive darkness with each warning. */
-	private const val DARKNESS_PADDING = 8.0
+	/** …until this tick, then nausea X for marked entities until the end. */
+	private const val NAUSEA_TIER2_START_TICKS = THIRD_WARNING_TICKS + 5 * TPS
 
-	/** Nausea ramp: second 25 through end of second 29 (100 ticks), amplifiers 1..20. */
-	private const val NAUSEA_RAMP_START_TICKS = 25 * TPS
-	private const val NAUSEA_RAMP_END_EXCLUSIVE = 30 * TPS
+	/** Reapply duration so effects don’t flicker between ticks. */
+	private const val EFFECT_REFRESH_TICKS = 6 * TPS
 
-	private const val NAUSEA_RAMP_REFRESH_TICKS = 25
+	/** Darkness duration per warning milestone (~3 s). */
+	private const val DARKNESS_WARNING_TICKS = 3 * TPS
 
 	private val sessions = Collections.synchronizedList(mutableListOf<Session>())
 	private val lastTriggerGameTick = ConcurrentHashMap<UUID, Int>()
@@ -55,7 +63,7 @@ object PerishSongHandler {
 	private class Session(
 		val level: ServerLevel,
 		val center: Vec3,
-		val marked: Set<UUID>,
+		val marked: MutableSet<UUID>,
 		val startTick: Int,
 		val focalLaprasUuid: UUID,
 	) {
@@ -86,6 +94,12 @@ object PerishSongHandler {
 		val center = lapras.position()
 		val marked = collectMarkedLiving(level, center, lapras.uuid)
 
+		for (uuid in marked) {
+			val entity = level.getEntity(uuid) as? LivingEntity ?: continue
+			applyBaseMarkEffects(entity)
+		}
+		playPerishSongSoundForMarkedPlayers(level, center, marked)
+
 		lastTriggerGameTick[sender.uuid] = now
 		synchronized(sessions) {
 			sessions.add(Session(level, center, marked, now, lapras.uuid))
@@ -93,6 +107,7 @@ object PerishSongHandler {
 	}
 
 	private fun tickWorld(level: ServerLevel) {
+		anchorFocalLapras(level)
 		val tick = level.server.tickCount
 		synchronized(sessions) {
 			val iter = sessions.iterator()
@@ -100,12 +115,15 @@ object PerishSongHandler {
 				val session = iter.next()
 				if (session.level !== level) continue
 				val elapsed = tick - session.startTick
-				tickNauseaRamp(level, session.center, session.focalLaprasUuid, elapsed)
+				tickMarkedEffects(level, session, elapsed)
 				while (session.nextMilestoneIndex < eventOffsetsTicks.size &&
 					elapsed >= eventOffsetsTicks[session.nextMilestoneIndex]
 				) {
 					when (session.nextMilestoneIndex) {
-						0, 1, 2 -> playWarning(level, session.center, session.nextMilestoneIndex, session.focalLaprasUuid)
+						0, 1, 2 -> {
+							applyDarknessToMarked(level, session)
+							broadcastFocalLaprasCry(level, session)
+						}
 						3 -> resolve(session)
 					}
 					session.nextMilestoneIndex++
@@ -117,56 +135,101 @@ object PerishSongHandler {
 		}
 	}
 
-	private fun playWarning(level: ServerLevel, center: Vec3, index: Int, focalLaprasUuid: UUID) {
-		if (index == 0) {
-			val lapras = level.getEntity(focalLaprasUuid) as? PokemonEntity
-			val at = lapras?.position() ?: center
-			playPerishSongSound(level, at)
-			if (lapras != null) {
-				LaprasPosableAnimationPackets.broadcastLaprasCry(lapras)
+	private fun anchorFocalLapras(level: ServerLevel) {
+		synchronized(sessions) {
+			for (session in sessions) {
+				if (session.level !== level) continue
+				val entity = level.getEntity(session.focalLaprasUuid) as? PokemonEntity ?: continue
+				val c = session.center
+				entity.setPos(c.x, c.y, c.z)
+				entity.deltaMovement = Vec3.ZERO
+				(entity as? Mob)?.navigation?.stop()
 			}
 		}
-		applyWarningDarkness(level, center, focalLaprasUuid)
 	}
 
-	private fun playPerishSongSound(level: ServerLevel, at: Vec3) {
-		level.playSound(null, at.x, at.y, at.z, BetterLaprasSounds.PERISH_SONG, SoundSource.NEUTRAL, 1.0f, 1.0f)
+	/**
+	 * Keeps glowing + slowness on still-marked targets; drops targets that leave [MARK_RADIUS] or unload;
+	 * applies nausea V from the third warning until [NAUSEA_TIER2_START_TICKS], then nausea X until 30s.
+	 */
+	private fun tickMarkedEffects(level: ServerLevel, session: Session, elapsed: Int) {
+		val center = session.center
+		val markIt = session.marked.iterator()
+		while (markIt.hasNext()) {
+			val uuid = markIt.next()
+			val entity = level.getEntity(uuid) as? LivingEntity
+			if (entity == null || !entity.isAlive) {
+				markIt.remove()
+				continue
+			}
+			if (entity.position().distanceToSqr(center) > markRadiusSq) {
+				clearPerishSongEffects(entity)
+				markIt.remove()
+				continue
+			}
+			applyBaseMarkEffects(entity)
+			// In-game "nausea" is [MobEffects.CONFUSION].
+			if (elapsed >= THIRD_WARNING_TICKS && elapsed < 30 * TPS) {
+				if (elapsed < NAUSEA_TIER2_START_TICKS) {
+					entity.addEffect(
+						MobEffectInstance(MobEffects.CONFUSION, EFFECT_REFRESH_TICKS, 5, false, false, true),
+					)
+				} else {
+					entity.addEffect(
+						MobEffectInstance(MobEffects.CONFUSION, EFFECT_REFRESH_TICKS, 10, false, false, true),
+					)
+				}
+			}
+		}
 	}
 
-	private fun applyWarningDarkness(level: ServerLevel, center: Vec3, excludeLaprasUuid: UUID) {
-		val r = RADIUS + DARKNESS_PADDING
-		val rsq = r * r
-		val box = AABB(center, center).inflate(r)
-		for (entity in level.getEntitiesOfClass(LivingEntity::class.java, box)) {
-			if (entity.uuid == excludeLaprasUuid) continue
-			if (entity.position().distanceToSqr(center) > rsq) continue
+	private fun applyBaseMarkEffects(entity: LivingEntity) {
+		entity.addEffect(MobEffectInstance(MobEffects.GLOWING, EFFECT_REFRESH_TICKS, 0, false, false, true))
+		entity.addEffect(MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, EFFECT_REFRESH_TICKS, 1, false, false, true))
+	}
+
+	private fun clearPerishSongEffects(entity: LivingEntity) {
+		entity.removeEffect(MobEffects.GLOWING)
+		entity.removeEffect(MobEffects.MOVEMENT_SLOWDOWN)
+		entity.removeEffect(MobEffects.DARKNESS)
+		entity.removeEffect(MobEffects.CONFUSION)
+	}
+
+	private fun broadcastFocalLaprasCry(level: ServerLevel, session: Session) {
+		val lapras = level.getEntity(session.focalLaprasUuid) as? PokemonEntity ?: return
+		LaprasPosableAnimationPackets.broadcastLaprasCry(lapras)
+	}
+
+	/** One of three darkness pulses at 0s / 10s / 20s for targets still marked and in range. */
+	private fun applyDarknessToMarked(level: ServerLevel, session: Session) {
+		for (uuid in session.marked.toList()) {
+			val entity = level.getEntity(uuid) as? LivingEntity ?: continue
+			if (entity.position().distanceToSqr(session.center) > markRadiusSq) continue
 			entity.addEffect(
 				MobEffectInstance(MobEffects.DARKNESS, DARKNESS_WARNING_TICKS, 0, false, false, true),
 			)
 		}
 	}
 
-	/**
-	 * [elapsed] 500–599: nausea amplifier 1→20 over the 25s–29s window ([MobEffects.CONFUSION]).
-	 */
-	private fun tickNauseaRamp(level: ServerLevel, center: Vec3, excludeLaprasUuid: UUID, elapsed: Int) {
-		if (elapsed < NAUSEA_RAMP_START_TICKS || elapsed >= NAUSEA_RAMP_END_EXCLUSIVE) return
-		val span = NAUSEA_RAMP_END_EXCLUSIVE - NAUSEA_RAMP_START_TICKS
-		val t = elapsed - NAUSEA_RAMP_START_TICKS
-		val denom = max(1, span - 1)
-		val amplifier = Mth.clamp(1 + (t * 19) / denom, 1, 20)
-		val box = AABB(center, center).inflate(RADIUS)
-		for (entity in level.getEntitiesOfClass(LivingEntity::class.java, box)) {
-			if (entity.uuid == excludeLaprasUuid) continue
-			if (entity.position().distanceToSqr(center) > radiusSq) continue
-			entity.addEffect(
-				MobEffectInstance(
-					MobEffects.CONFUSION,
-					NAUSEA_RAMP_REFRESH_TICKS,
-					amplifier,
-					false,
-					false,
-					true,
+	private fun playPerishSongSoundForMarkedPlayers(level: ServerLevel, at: Vec3, marked: Set<UUID>) {
+		val holder: Holder<SoundEvent> = Holder.direct(BetterLaprasSounds.PERISH_SONG)
+		val maxD = MARK_RADIUS
+		val maxDSq = maxD * maxD
+		for (uuid in marked) {
+			val player = level.getEntity(uuid) as? ServerPlayer ?: continue
+			if (player.position().distanceToSqr(at) > maxDSq) continue
+			val dist = sqrt(player.position().distanceToSqr(at))
+			val factor = (1.0 - dist / maxD).toFloat().coerceIn(0f, 1f)
+			player.connection.send(
+				ClientboundSoundPacket(
+					holder,
+					SoundSource.NEUTRAL,
+					at.x,
+					at.y,
+					at.z,
+					factor,
+					1.0f,
+					level.random.nextLong(),
 				),
 			)
 		}
@@ -174,20 +237,19 @@ object PerishSongHandler {
 
 	private fun resolve(session: Session) {
 		val level = session.level
-		for (uuid in session.marked) {
+		for (uuid in session.marked.toList()) {
 			if (uuid == session.focalLaprasUuid) continue
 			val entity = level.getEntity(uuid) as? LivingEntity ?: continue
-			if (entity.position().distanceToSqr(session.center) > radiusSq) continue
 			entity.kill()
 		}
 	}
 
-	private fun collectMarkedLiving(level: ServerLevel, center: Vec3, excludeUuid: UUID): Set<UUID> {
-		val box = AABB(center, center).inflate(RADIUS)
+	private fun collectMarkedLiving(level: ServerLevel, center: Vec3, excludeUuid: UUID): MutableSet<UUID> {
+		val box = AABB(center, center).inflate(MARK_RADIUS)
 		val out = mutableSetOf<UUID>()
 		for (entity in level.getEntitiesOfClass(LivingEntity::class.java, box)) {
 			if (entity.uuid == excludeUuid) continue
-			if (entity.position().distanceToSqr(center) <= radiusSq) {
+			if (entity.position().distanceToSqr(center) <= markRadiusSq) {
 				out.add(entity.uuid)
 			}
 		}
