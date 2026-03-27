@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras.compat
+package com.celestial_manta.betterlapras.commands
 
 import com.cobblemon.mod.common.Cobblemon
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties

@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.moves.projectile
 
 import net.minecraft.client.renderer.culling.Frustum
 import net.minecraft.client.renderer.entity.EntityRenderer

@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.moves.effects
 
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB

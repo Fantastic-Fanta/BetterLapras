@@ -1,5 +1,6 @@
 package com.celestial_manta.betterlapras
 
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasMoveProjectile
 import net.minecraft.core.Registry
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation

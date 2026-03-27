@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.moves.projectile
 
 import com.cobblemon.mod.common.api.types.ElementalTypes
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity

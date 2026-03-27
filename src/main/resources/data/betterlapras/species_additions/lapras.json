@@ -1,3 +1,287 @@
 {
-	"target": "cobblemon:lapras"
+  "target": "cobblemon:lapras",
+  "abilities": [
+    "waterabsorb",
+    "waterbubble",
+    "h:hydration"
+  ],
+  "riding": {
+    "behaviours": {
+      "LAND": {
+        "key": "cobblemon:land/horse",
+        "rideSounds": [],
+        "canJump": true,
+        "canSprint": true,
+        "stats": {
+          "ACCELERATION": "10-40",
+          "JUMP": "20-30",
+          "SKILL": "80-100",
+          "SPEED": "30-50",
+          "STAMINA": "50-70"
+        }
+      },
+      "LIQUID": {
+        "key": "cobblemon:liquid/boat",
+        "rideSounds": [
+          {
+            "muffleEnabled": true,
+            "pitchExpr": "math.max(1.0 ,0.2 + math.pow(math.min(q.ride_velocity() / 1.5, 1.0),2))",
+            "playForNonPassengers": false,
+            "playForPassengers": true,
+            "soundLocation": "cobblemon:ride.loop.water_sufrace.stereo",
+            "volumeExpr": "math.pow(math.min(q.ride_velocity() / 1.5, 1.0),2)"
+          },
+          {
+            "muffleEnabled": true,
+            "pitchExpr": "math.max(1.0 ,0.2 + math.pow(math.min(q.ride_velocity() / 1.5, 1.0),2))",
+            "playForNonPassengers": true,
+            "playForPassengers": false,
+            "soundLocation": "cobblemon:ride.loop.water_surface.mono",
+            "volumeExpr": "math.pow(math.min(q.ride_velocity() / 1.5, 1.0),2)"
+          }
+        ],
+        "stats": {
+          "ACCELERATION": "55-75",
+          "JUMP": "30-40",
+          "SKILL": "75-125",
+          "SPEED": "55-75",
+          "STAMINA": "125-155"
+        },
+        "surfaceLevelOffset": -1.6
+      }
+    },
+    "seats": [
+      {
+        "offset": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "poseOffsets": [
+          {
+            "offset": {
+              "x": 0.0,
+              "y": -1.377378,
+              "z": 0.081582785
+            },
+            "poseTypes": [
+              "STAND"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.0,
+              "y": -1.3771001,
+              "z": 0.24808589
+            },
+            "poseTypes": [
+              "WALK"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.0,
+              "y": -1.377378,
+              "z": 0.081582785
+            },
+            "poseTypes": [
+              "HOVER"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.0,
+              "y": -1.377378,
+              "z": 0.081582785
+            },
+            "poseTypes": [
+              "FLY"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.05,
+              "y": -1.0596714,
+              "z": 0.08635005
+            },
+            "poseTypes": [
+              "FLOAT"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.05959252,
+              "y": -1.0513167,
+              "z": -0.1178946
+            },
+            "poseTypes": [
+              "SWIM"
+            ]
+          },
+          {
+            "offset": {
+              "x": 0.0,
+              "y": -1.377378,
+              "z": 0.081582785
+            },
+            "poseTypes": [
+              "GLIDE"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "moves": [
+    "1:growl",
+    "1:watergun",
+    "5:sing",
+    "10:mist",
+    "15:lifedew",
+    "20:iceshard",
+    "25:confuseray",
+    "30:waterpulse",
+    "35:brine",
+    "40:bodyslam",
+    "45:icebeam",
+    "50:raindance",
+    "55:hydropump",
+    "60:perishsong",
+    "65:sheercold",
+    "egg:ancientpower",
+    "egg:curse",
+    "egg:fissure",
+    "egg:foresight",
+    "egg:freezedry",
+    "egg:horndrill",
+    "egg:refresh",
+    "egg:sparklingaria",
+    "egg:tickle",
+    "tm:sheercold",
+    "tm:alluringvoice",
+    "tm:ancientpower",
+    "tm:aquatail",
+    "tm:avalanche",
+    "tm:blizzard",
+    "tm:block",
+    "tm:bodypress",
+    "tm:bodyslam",
+    "tm:brine",
+    "tm:bulldoze",
+    "tm:charm",
+    "tm:chillingwater",
+    "tm:confuseray",
+    "tm:curse",
+    "tm:disarmingvoice",
+    "tm:dive",
+    "tm:doubleedge",
+    "tm:dragoncheer",
+    "tm:dragondance",
+    "tm:dragonpulse",
+    "tm:dreameater",
+    "tm:drillrun",
+    "tm:earthquake",
+    "tm:echoedvoice",
+    "tm:endure",
+    "tm:facade",
+    "tm:frostbreath",
+    "tm:gigaimpact",
+    "tm:hail",
+    "tm:haze",
+    "tm:headbutt",
+    "tm:healbell",
+    "tm:helpinghand",
+    "tm:hydropump",
+    "tm:hyperbeam",
+    "tm:hypervoice",
+    "tm:icebeam",
+    "tm:iciclespear",
+    "tm:icywind",
+    "tm:ironhead",
+    "tm:irontail",
+    "tm:liquidation",
+    "tm:megahorn",
+    "tm:muddywater",
+    "tm:outrage",
+    "tm:protect",
+    "tm:psychic",
+    "tm:psychicnoise",
+    "tm:raindance",
+    "tm:reflect",
+    "tm:rest",
+    "tm:rocksmash",
+    "tm:safeguard",
+    "tm:shockwave",
+    "tm:signalbeam",
+    "tm:sleeptalk",
+    "tm:smartstrike",
+    "tm:snowscape",
+    "tm:strength",
+    "tm:substitute",
+    "tm:surf",
+    "tm:takedown",
+    "tm:terablast",
+    "tm:thunder",
+    "tm:thunderbolt",
+    "tm:waterfall",
+    "tm:waterpulse",
+    "tm:weatherball",
+    "tm:whirlpool",
+    "tm:zenheadbutt",
+    "tutor:ancientpower",
+    "tutor:aquatail",
+    "tutor:block",
+    "tutor:bulldoze",
+    "tutor:dive",
+    "tutor:dragonpulse",
+    "tutor:drillrun",
+    "tutor:gigaimpact",
+    "tutor:healbell",
+    "tutor:helpinghand",
+    "tutor:hyperbeam",
+    "tutor:hypervoice",
+    "tutor:icebeam",
+    "tutor:icywind",
+    "tutor:ironhead",
+    "tutor:irontail",
+    "tutor:liquidation",
+    "tutor:megahorn",
+    "tutor:outrage",
+    "tutor:psychic",
+    "tutor:rest",
+    "tutor:rocksmash",
+    "tutor:shockwave",
+    "tutor:signalbeam",
+    "tutor:sleeptalk",
+    "tutor:thunderbolt",
+    "tutor:waterpulse",
+    "tutor:zenheadbutt",
+    "legacy:attract",
+    "tm:aurorabeam",
+    "legacy:bide",
+    "legacy:bubblebeam",
+    "legacy:captivate",
+    "legacy:confide",
+    "legacy:doubleteam",
+    "legacy:dragonbreath",
+    "legacy:dragonrage",
+    "legacy:frustration",
+    "tm:futuresight",
+    "legacy:hiddenpower",
+    "tm:mimic",
+    "legacy:naturalgift",
+    "legacy:nightmare",
+    "legacy:psywave",
+    "legacy:rage",
+    "legacy:return",
+    "legacy:roar",
+    "legacy:round",
+    "legacy:secretpower",
+    "legacy:skullbash",
+    "legacy:snore",
+    "legacy:solarbeam",
+    "legacy:swagger",
+    "legacy:toxic",
+    "legacy:zapcannon"
+  ]
 }

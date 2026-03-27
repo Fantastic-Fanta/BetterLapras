@@ -1,7 +1,7 @@
 package com.celestial_manta.betterlapras.mixin;
 
-import com.celestial_manta.betterlapras.LaprasMoveCombat;
-import com.celestial_manta.betterlapras.LaprasSlot1SupportMoves;
+import com.celestial_manta.betterlapras.lapras.ai.LaprasMoveCombat;
+import com.celestial_manta.betterlapras.lapras.ai.LaprasSlot1SupportMoves;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

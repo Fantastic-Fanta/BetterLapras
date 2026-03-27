@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.ai
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import net.minecraft.world.entity.LivingEntity

@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.moves.projectile
 
 /**
  * Per-[LaprasPulseKind] strike damage for ranged volleys and melee-replaced shots.

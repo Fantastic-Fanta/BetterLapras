@@ -1,8 +1,9 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.ai
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormEntityParticlePacket
 import com.cobblemon.mod.common.pokemon.status.statuses.persistent.SleepStatus
+import com.celestial_manta.betterlapras.network.LaprasPosableAnimationPackets
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel

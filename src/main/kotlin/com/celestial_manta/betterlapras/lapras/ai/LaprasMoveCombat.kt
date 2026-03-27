@@ -1,6 +1,13 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.ai
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
+import com.celestial_manta.betterlapras.BetterLaprasEntities
+import com.celestial_manta.betterlapras.lapras.moves.effects.LaprasIceBeamEffects
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasMoveDamageFormulas
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasMoveProjectile
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasMoveShotProfiles
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasPulseKind
+import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasShotProfile
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel

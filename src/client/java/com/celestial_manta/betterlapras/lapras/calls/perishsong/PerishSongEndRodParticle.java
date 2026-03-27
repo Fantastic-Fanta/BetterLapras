@@ -1,4 +1,4 @@
-package com.celestial_manta.betterlapras;
+package com.celestial_manta.betterlapras.lapras.calls.perishsong;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;

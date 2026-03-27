@@ -1,6 +1,8 @@
 package com.celestial_manta.betterlapras
 
-import com.celestial_manta.betterlapras.compat.CobbreedingEggCommands
+import com.celestial_manta.betterlapras.commands.CobbreedingEggCommands
+import com.celestial_manta.betterlapras.content.blocks.BlocksRegistration
+import com.celestial_manta.betterlapras.lapras.calls.perishsong.PerishSongHandler
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.loader.api.FabricLoader
 import org.slf4j.LoggerFactory
@@ -12,6 +14,7 @@ object BetterLapras : ModInitializer {
 		BetterLaprasSounds.register()
 		BetterLaprasParticles.register()
 		BetterLaprasEntities.register()
+		BlocksRegistration.register()
 		PerishSongHandler.register()
 
 		if (FabricLoader.getInstance().isModLoaded("cobbreeding")) {

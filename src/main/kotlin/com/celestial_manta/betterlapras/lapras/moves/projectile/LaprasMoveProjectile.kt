@@ -1,12 +1,16 @@
-package com.celestial_manta.betterlapras
+package com.celestial_manta.betterlapras.lapras.moves.projectile
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity
 import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormEntityParticlePacket
 import com.cobblemon.mod.common.net.messages.client.effect.SpawnSnowstormParticlePacket
+import com.celestial_manta.betterlapras.lapras.ai.betterLaprasStrikeTargetPoint
+import com.celestial_manta.betterlapras.lapras.moves.effects.LaprasIceBeamEffects
+import com.celestial_manta.betterlapras.lapras.moves.effects.LaprasSheerColdCone
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.syncher.SynchedEntityData
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.sounds.SoundSource
@@ -22,7 +26,6 @@ import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
-import net.minecraft.resources.ResourceLocation
 import kotlin.math.ceil
 
 /**
