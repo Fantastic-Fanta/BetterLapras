@@ -6,7 +6,8 @@ import net.minecraft.core.particles.SimpleParticleType
 import net.minecraft.resources.ResourceLocation
 
 /**
- * Custom [SimpleParticleType]s: end rod (short life), floaty note (vanilla note look, gentle drift).
+ * Custom [SimpleParticleType]s: end rod (short life), floaty note (vanilla note look, gentle drift),
+ * Gmax force-field ring (mesh-style ring, beam texture).
  */
 object BetterLaprasParticles {
 	val PERISH_SONG_END_ROD_ID: ResourceLocation =
@@ -19,8 +20,15 @@ object BetterLaprasParticles {
 
 	val FLOATY_NOTE: SimpleParticleType = FabricParticleTypes.simple()
 
+	val GMAX_FORCE_FIELD_RING_ID: ResourceLocation =
+		ResourceLocation.fromNamespaceAndPath("betterlapras", "gmax_force_field_ring")
+
+	/** [alwaysSpawn] so the ring is not culled by distance; same flag as other visible cosmetics. */
+	val GMAX_FORCE_FIELD_RING: SimpleParticleType = FabricParticleTypes.simple(true)
+
 	fun register() {
 		net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, PERISH_SONG_END_ROD_ID, PERISH_SONG_END_ROD)
 		net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, FLOATY_NOTE_ID, FLOATY_NOTE)
+		net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, GMAX_FORCE_FIELD_RING_ID, GMAX_FORCE_FIELD_RING)
 	}
 }

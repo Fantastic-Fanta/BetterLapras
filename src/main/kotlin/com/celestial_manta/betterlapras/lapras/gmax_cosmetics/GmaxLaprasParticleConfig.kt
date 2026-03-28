@@ -1,14 +1,22 @@
 package com.celestial_manta.betterlapras.lapras.gmax_cosmetics
 
 /**
- * Ring size / height base for Gigantamax Lapras vanilla end rods ([GmaxLaprasEndRodWave]).
+ * Ring size / height for Gigantamax Lapras cosmetics: beam force-field ring ([GmaxLaprasParticles])
+ * and legacy end-rod helix ([GmaxLaprasEndRodWave]) if re-enabled.
  * Wave amplitude / k / Perish phase use [com.celestial_manta.betterlapras.lapras.calls.perishsong.PerishSongConfig].
  */
 object GmaxLaprasParticleConfig {
 	const val RING_RADIUS_INNER = 9.0
-	const val RING_RADIUS_OUTER = 13.5
+	const val RING_RADIUS_OUTER = 9.0
 	/** Vertical offset from entity feet so the ring sits around the body, not under the floor. */
 	const val RING_Y_OFFSET = 5.5
+
+	/**
+	 * Gmax models are much larger than base Lapras; the force-field ring uses at least the end-rod radii
+	 * and expands to sit outside the entity hitbox so it stays visible (same *relative* read as the helix).
+	 */
+	const val FORCE_FIELD_RING_BB_HORIZONTAL_MARGIN = 1.35
+	const val FORCE_FIELD_RING_BB_VERTICAL_FRAC = 0.42
 
 	/**
 	 * Orbit rate: polar angle θ advances as `gameTime * this` (radians per game tick).

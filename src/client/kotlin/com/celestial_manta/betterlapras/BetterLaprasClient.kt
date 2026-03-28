@@ -2,6 +2,7 @@ package com.celestial_manta.betterlapras
 
 import com.celestial_manta.betterlapras.lapras.calls.perishsong.FloatyNoteParticle
 import com.celestial_manta.betterlapras.lapras.calls.perishsong.PerishSongEndRodParticle
+import com.celestial_manta.betterlapras.lapras.gmax_cosmetics.GmaxForceFieldRingParticle
 import com.celestial_manta.betterlapras.lapras.moves.projectile.LaprasMoveProjectileRenderer
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider
@@ -22,6 +23,11 @@ object BetterLaprasClient : ClientModInitializer {
 			BetterLaprasParticles.FLOATY_NOTE,
 		) { sprites: FabricSpriteProvider ->
 			FloatyNoteParticle.Provider(sprites)
+		}
+		ParticleFactoryRegistry.getInstance().register(
+			BetterLaprasParticles.GMAX_FORCE_FIELD_RING,
+		) { sprites: FabricSpriteProvider ->
+			GmaxForceFieldRingParticle.Provider(sprites)
 		}
 		EntityRendererRegistry.register(BetterLaprasEntities.LAPRAS_MOVE_PROJECTILE, ::LaprasMoveProjectileRenderer)
 		logger.info("BetterLapras client initialized")
