@@ -8,26 +8,43 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 object PerishSongParticles {
-	fun tickSessionParticles(level: ServerLevel, session: PerishSongSession, gameTime: Double, serverTick: Int) {
-		val c = session.center
+	/**
+	 * Double horizontal end-rod rings with transverse wave (Perish Song + Gmax Lapras cosmetics).
+	 * @param innerRadius [PerishSongConfig.PERISH_RING_RADIUS_INNER] when using defaults.
+	 * @param outerRadius [PerishSongConfig.PERISH_RING_RADIUS_OUTER] when using defaults.
+	 * @param ringYOffset [PerishSongConfig.PERISH_RING_Y_OFFSET] when using defaults.
+	 */
+	fun tickEndRodRingsAroundCenter(
+		level: ServerLevel,
+		center: Vec3,
+		gameTime: Double,
+		innerRadius: Double = PerishSongConfig.PERISH_RING_RADIUS_INNER,
+		outerRadius: Double = PerishSongConfig.PERISH_RING_RADIUS_OUTER,
+		ringYOffset: Double = PerishSongConfig.PERISH_RING_Y_OFFSET,
+	) {
 		val phaseRod = gameTime * PerishSongConfig.PERISH_WAVE_PHASE_PER_TICK
 		val nRod = PerishSongConfig.PERISH_RING_SEGMENTS
 		val rodRings = arrayOf(
-			Pair(PerishSongConfig.PERISH_RING_RADIUS_INNER, 1.0),
-			Pair(PerishSongConfig.PERISH_RING_RADIUS_OUTER, -1.0),
+			Pair(innerRadius, 1.0),
+			Pair(outerRadius, -1.0),
 		)
 		for (i in 0 until nRod) {
 			val theta = (i / nRod.toDouble()) * 2.0 * PI
 			for ((radius, phaseSign) in rodRings) {
-				val x = c.x + radius * cos(theta)
-				val z = c.z + radius * sin(theta)
-				val y = c.y + PerishSongConfig.PERISH_RING_Y_OFFSET +
+				val x = center.x + radius * cos(theta)
+				val z = center.z + radius * sin(theta)
+				val y = center.y + ringYOffset +
 					PerishSongConfig.PERISH_WAVE_AMP_BLOCKS * sin(
 						PerishSongConfig.PERISH_WAVE_PEAKS_AROUND_RING * theta + phaseSign * phaseRod,
 					)
 				sendPerishSongParticleForce(level, x, y, z)
 			}
 		}
+	}
+
+	fun tickSessionParticles(level: ServerLevel, session: PerishSongSession, gameTime: Double, serverTick: Int) {
+		val c = session.center
+		tickEndRodRingsAroundCenter(level, c, gameTime)
 		tickOccasionalNotes(level, c, serverTick, session.startTick)
 	}
 

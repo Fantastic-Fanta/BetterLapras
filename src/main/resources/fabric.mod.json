@@ -40,7 +40,8 @@
 		"cobblemon": ">=1.7.3"
 	},
 	"suggests": {
-		"cobbreeding": ">=2.1.0"
+		"cobbreeding": ">=2.1.0",
+		"mega_showdown": ">=1.7.0"
 	},
 	"custom": {
 		"fabric:resource_load_order": {

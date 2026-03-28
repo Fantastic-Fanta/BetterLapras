@@ -2,6 +2,7 @@ package com.celestial_manta.betterlapras.mixin;
 
 import com.celestial_manta.betterlapras.lapras.ai.LaprasMoveCombat;
 import com.celestial_manta.betterlapras.lapras.ai.LaprasSlot1SupportMoves;
+import com.celestial_manta.betterlapras.lapras.gmax_cosmetics.GmaxLaprasParticles;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,5 +17,6 @@ public class LaprasRangedTickMixin {
 		PokemonEntity self = (PokemonEntity) (Object) this;
 		LaprasSlot1SupportMoves.tickSlot1Support(self);
 		LaprasMoveCombat.tickRangedVolley(self);
+		GmaxLaprasParticles.tick(self);
 	}
 }
