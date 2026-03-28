@@ -1,0 +1,16 @@
+{
+"species":"cobblemon:lapras",
+"order":1,
+"variations":[
+{
+"aspects":["gmax"],
+"poser":"cobblemon:lapras_gmax",
+"model":"cobblemon:lapras_gmax.geo",
+"texture":"cobblemon:textures/pokemon/0131_lapras/lapras_gmax.png",
+},
+{
+"aspects":["shiny","gmax"],
+"texture":"cobblemon:textures/pokemon/0131_lapras/lapras_gmax_shiny.png",
+}
+]
+}

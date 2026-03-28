@@ -128,7 +128,7 @@ object CobbreedingEggCommands {
 		}
 		val stack = player.mainHandItem
 		if (stack.item !is PokemonEgg) {
-			source.sendFailure(Component.literal("Hold a Cobbreeding Pokémon egg in the main hand."))
+			source.sendFailure(Component.literal("Hold a Pokémon egg in the main hand!"))
 			return 0
 		}
 		val eggInfo = stack.get(PokemonEgg.EGG_INFO)
@@ -141,7 +141,7 @@ object CobbreedingEggCommands {
 				EggUtilities.decrypt(eggInfo)
 			} catch (e: Exception) {
 				log.error(
-					"Lapras /lapras egg info: failed to decrypt egg_info (AES key file: {}).",
+					"Decryption failure.",
 					Cobbreeding.ENCRYPTION_KEY_PATH,
 					e,
 				)
@@ -227,7 +227,7 @@ object CobbreedingEggCommands {
 		}
 		val summary =
 			if (lines.isEmpty()) {
-				"No matching Pokémon eggs (decrypted egg_info, key: ${Cobbreeding.ENCRYPTION_KEY_PATH})."
+				"Nothing found"
 			} else {
 				lines.joinToString("\n")
 			}

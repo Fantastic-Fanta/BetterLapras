@@ -283,5 +283,52 @@
     "legacy:swagger",
     "legacy:toxic",
     "legacy:zapcannon"
+  ],
+  "forms": [
+    {
+      "name": "Gmax",
+      "primaryType": "water",
+      "secondaryType": "ice",
+      "maleRatio": 0.5,
+      "height": 240,
+      "weight": 0,
+      "pokedex": [
+        "cobblemon.species.lapras-gmax.desc"
+      ],
+      "labels": [
+        "gen8",
+        "gmax"
+      ],
+      "aspects": [
+        "gmax"
+      ],
+      "dynamaxBlocked": true,
+      "behaviour": {
+        "moving": {
+          "swim": {
+            "canBreatheUnderwater": true,
+            "canSwimInLava": false,
+            "canSwimInWater": true,
+            "canWalkOnWater": true,
+            "swimSpeed": "0.2"
+          },
+          "walk": {
+            "walkSpeed": 0.15
+          }
+        },
+        "resting": {
+          "canSleep": true,
+          "light": "0-4"
+        }
+      },
+      "evolutions": [],
+      "battleOnly": true,
+      "baseScale": 1.2,
+      "hitbox": {
+        "width": 2.6,
+        "height": 3.0,
+        "fixed": false
+      }
+    }
   ]
 }
