@@ -43,4 +43,33 @@ object GmaxLaprasParticleConfig {
 	 * Emitters evenly spaced in phase (1 = one spiral/stream; 2+ = parallel streams around Lapras).
 	 */
 	const val ORBIT_EMITTER_COUNT = 20
+
+	// --- Gmax cloud cluster particle ([GmaxCloudClusterParticle]) ---
+
+	const val CLOUD_CLUSTER_PARTICLE_LIFETIME_TICKS = 6000
+
+	const val CLOUD_CLUSTER_PUFFS_PER_CLUSTER = 52
+	const val CLOUD_CLUSTER_SPREAD = 0.82f
+	const val CLOUD_CLUSTER_PUFF_QUAD_SIZE = 0.55f
+	const val CLOUD_CLUSTER_ORBIT_RAD_PER_TICK = 0.04f
+	const val CLOUD_CLUSTER_VERTICAL_BOB_AMP = 0.5f
+	const val CLOUD_CLUSTER_BACK_OFFSET_BLOCKS = 2.0f
+	const val CLOUD_CLUSTER_RUMBLE_AMP = 0.2f
+	const val CLOUD_CLUSTER_RUMBLE_AMP_Y = 0.14f
+	const val CLOUD_CLUSTER_QUAD_PULSE = 0.07f
+
+	const val CLOUD_CLUSTER_TINT_R = 0.52f
+	const val CLOUD_CLUSTER_TINT_G = 0.07f
+	const val CLOUD_CLUSTER_TINT_B = 0.09f
+	const val CLOUD_CLUSTER_TINT_A = 0.94f
+
+	const val CLOUD_CLUSTER_PUFF_SCALE_MIN = 0.72f
+	const val CLOUD_CLUSTER_PUFF_SCALE_SPREAD = 0.45f
+	const val CLOUD_CLUSTER_PUFF_ALPHA_MIN = 0.68f
+	const val CLOUD_CLUSTER_PUFF_ALPHA_SPREAD = 0.28f
+	const val CLOUD_CLUSTER_RUMBLE_SPEED_MIN = 0.052f
+	const val CLOUD_CLUSTER_RUMBLE_SPEED_SPREAD = 0.095f
+
+	/** Main cluster billboard alpha (multi-puff aggregate). */
+	const val CLOUD_CLUSTER_MAIN_ALPHA = 0.85f
 }

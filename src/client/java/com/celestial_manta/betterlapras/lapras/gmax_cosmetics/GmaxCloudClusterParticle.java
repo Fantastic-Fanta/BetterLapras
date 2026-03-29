@@ -2,8 +2,6 @@ package com.celestial_manta.betterlapras.lapras.gmax_cosmetics;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-import com.celestial_manta.betterlapras.BetterLaprasParticles;
-
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Camera;
@@ -13,6 +11,7 @@ import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.Mth;
@@ -23,43 +22,26 @@ import org.joml.Vector3f;
 /**
  * Two dense smoke clusters that orbit above a Gigantamax Lapras (Gmax-style
  * storm clouds), biased toward the entity’s back (opposite
- * {@link Entity#getLookAngle()}). Short-lived
- * {@link GmaxCloudTrailPuffParticle}s are spawned each tick along the path so
- * clouds linger ~1s and fade. Each main puff uses
+ * {@link Entity#getLookAngle()}). Each puff uses
  * {@link net.minecraft.client.particle.SingleQuadParticle}'s {@code render}
  * path.
  */
 @Environment(EnvType.CLIENT)
 public final class GmaxCloudClusterParticle extends TextureSheetParticle {
-	private static final int PUFFS_PER_CLUSTER = 52;
-	/**
-	 * Horizontal spread of each cluster (blocks); lower = tighter / denser cloud.
-	 */
-	private static final float CLUSTER_SPREAD = 0.82F;
-	/** Billboard half-size scale for each puff. */
-	private static final float PUFF_QUAD_SIZE = 0.55F;
-	/** Orbit speed around the entity (rad/tick). */
-	private static final float ORBIT_RAD_PER_TICK = 0.04F;
-	/** Gentle bob (blocks). */
-	private static final float VERTICAL_BOB_AMP = 0.5F;
-	/**
-	 * Shift cluster centers toward the entity's back (opposite look), horizontal
-	 * (blocks).
-	 */
-	private static final float BACK_OFFSET_BLOCKS = 2.0F;
-	/** Client-only puffs dropped along the orbit each tick (~1s lifetime each). */
-	private static final int TRAIL_PUFFS_PER_CLUSTER = 7;
-	private static final double TRAIL_SPAWN_JITTER = 0.55;
-	/** Per-puff slow oscillation inside the cluster (blocks). */
-	private static final float RUMBLE_AMP = 0.2F;
-	private static final float RUMBLE_AMP_Y = 0.14F;
-	/** Slight breathing on quad size so the mass feels alive. */
-	private static final float QUAD_PULSE = 0.07F;
-	/** Dark red tint (multiplies sprite). */
-	private static final float TINT_R = 0.52F;
-	private static final float TINT_G = 0.07F;
-	private static final float TINT_B = 0.09F;
-	private static final float TINT_A = 0.94F;
+	/** Short names for loops; values from {@link GmaxLaprasParticleConfig}. */
+	private static final int PUFFS_PER_CLUSTER = GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFFS_PER_CLUSTER;
+	private static final float CLUSTER_SPREAD = GmaxLaprasParticleConfig.CLOUD_CLUSTER_SPREAD;
+	private static final float PUFF_QUAD_SIZE = GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFF_QUAD_SIZE;
+	private static final float ORBIT_RAD_PER_TICK = GmaxLaprasParticleConfig.CLOUD_CLUSTER_ORBIT_RAD_PER_TICK;
+	private static final float VERTICAL_BOB_AMP = GmaxLaprasParticleConfig.CLOUD_CLUSTER_VERTICAL_BOB_AMP;
+	private static final float BACK_OFFSET_BLOCKS = GmaxLaprasParticleConfig.CLOUD_CLUSTER_BACK_OFFSET_BLOCKS;
+	private static final float RUMBLE_AMP = GmaxLaprasParticleConfig.CLOUD_CLUSTER_RUMBLE_AMP;
+	private static final float RUMBLE_AMP_Y = GmaxLaprasParticleConfig.CLOUD_CLUSTER_RUMBLE_AMP_Y;
+	private static final float QUAD_PULSE = GmaxLaprasParticleConfig.CLOUD_CLUSTER_QUAD_PULSE;
+	private static final float TINT_R = GmaxLaprasParticleConfig.CLOUD_CLUSTER_TINT_R;
+	private static final float TINT_G = GmaxLaprasParticleConfig.CLOUD_CLUSTER_TINT_G;
+	private static final float TINT_B = GmaxLaprasParticleConfig.CLOUD_CLUSTER_TINT_B;
+	private static final float TINT_A = GmaxLaprasParticleConfig.CLOUD_CLUSTER_TINT_A;
 
 	private final int targetEntityId;
 	private final float orbitRadius;
@@ -89,11 +71,11 @@ public final class GmaxCloudClusterParticle extends TextureSheetParticle {
 		this.orbitRadius = (float) orbitRadius;
 		this.cloudYOffset = (float) cloudYOffset;
 		this.hasPhysics = false;
-		this.lifetime = 6000;
+		this.lifetime = GmaxLaprasParticleConfig.CLOUD_CLUSTER_PARTICLE_LIFETIME_TICKS;
 		this.rCol = TINT_R;
 		this.gCol = TINT_G;
 		this.bCol = TINT_B;
-		this.alpha = 0.85f;
+		this.alpha = GmaxLaprasParticleConfig.CLOUD_CLUSTER_MAIN_ALPHA;
 
 		this.puffSprites = new TextureAtlasSprite[PUFFS_PER_CLUSTER * 2];
 		this.puffOffsets = new Vector3f[2][PUFFS_PER_CLUSTER];
@@ -109,13 +91,16 @@ public final class GmaxCloudClusterParticle extends TextureSheetParticle {
 				float oy = (this.random.nextFloat() - 0.5F) * 1.35F * CLUSTER_SPREAD;
 				float oz = (this.random.nextFloat() - 0.5F) * 2.0F * CLUSTER_SPREAD;
 				this.puffOffsets[c][i] = new Vector3f(ox, oy, oz);
-				this.puffScales[idx] = 0.72F + this.random.nextFloat() * 0.45F;
-				this.puffAlphas[idx] = 0.68F + this.random.nextFloat() * 0.28F;
+				this.puffScales[idx] = GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFF_SCALE_MIN
+						+ this.random.nextFloat() * GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFF_SCALE_SPREAD;
+				this.puffAlphas[idx] = GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFF_ALPHA_MIN
+						+ this.random.nextFloat() * GmaxLaprasParticleConfig.CLOUD_CLUSTER_PUFF_ALPHA_SPREAD;
 				this.rumblePhase[idx] = new Vector3f(
 						this.random.nextFloat() * Mth.TWO_PI,
 						this.random.nextFloat() * Mth.TWO_PI,
 						this.random.nextFloat() * Mth.TWO_PI);
-				this.rumbleSpeed[idx] = 0.052F + this.random.nextFloat() * 0.095F;
+				this.rumbleSpeed[idx] = GmaxLaprasParticleConfig.CLOUD_CLUSTER_RUMBLE_SPEED_MIN
+						+ this.random.nextFloat() * GmaxLaprasParticleConfig.CLOUD_CLUSTER_RUMBLE_SPEED_SPREAD;
 			}
 		}
 		this.orbitAngleRad = this.random.nextFloat() * Mth.TWO_PI;
@@ -127,6 +112,11 @@ public final class GmaxCloudClusterParticle extends TextureSheetParticle {
 	@Override
 	public ParticleRenderType getRenderType() {
 		return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
+	}
+
+	@Override
+	protected int getLightColor(float partialTick) {
+		return LightTexture.FULL_BRIGHT;
 	}
 
 	@Override
@@ -146,40 +136,6 @@ public final class GmaxCloudClusterParticle extends TextureSheetParticle {
 			this.x = e.getX();
 			this.y = e.getY();
 			this.z = e.getZ();
-			float bob = Mth.sin(this.age * 0.06F) * VERTICAL_BOB_AMP;
-			double bx = 0.0;
-			double bz = 0.0;
-			Vec3 look = e.getLookAngle();
-			double hLen = Math.sqrt(look.x * look.x + look.z * look.z);
-			if (hLen > 1.0E-4) {
-				bx = -look.x / hLen * BACK_OFFSET_BLOCKS;
-				bz = -look.z / hLen * BACK_OFFSET_BLOCKS;
-			}
-			for (int c = 0; c < 2; c++) {
-				float theta = this.orbitAngleRad + c * Mth.PI;
-				float ocx = Mth.cos(theta) * this.orbitRadius;
-				float ocz = Mth.sin(theta) * this.orbitRadius;
-				double cx = e.getX() + ocx + bx;
-				double cy = e.getY() + this.cloudYOffset + bob + offYForCluster(c);
-				double cz = e.getZ() + ocz + bz;
-				for (int k = 0; k < TRAIL_PUFFS_PER_CLUSTER; k++) {
-					double jx = (this.random.nextDouble() - 0.5) * 2.0 * TRAIL_SPAWN_JITTER;
-					double jy = (this.random.nextDouble() - 0.5) * 2.0 * TRAIL_SPAWN_JITTER * 0.55;
-					double jz = (this.random.nextDouble() - 0.5) * 2.0 * TRAIL_SPAWN_JITTER;
-					double vx = (this.random.nextDouble() - 0.5) * 0.052;
-					double vy = (this.random.nextDouble() - 0.5) * 0.034;
-					double vz = (this.random.nextDouble() - 0.5) * 0.052;
-					this.level.addParticle(
-							BetterLaprasParticles.GMAX_CLOUD_TRAIL_PUFF,
-							true,
-							cx + jx,
-							cy + jy,
-							cz + jz,
-							vx,
-							vy,
-							vz);
-				}
-			}
 		}
 	}
 
