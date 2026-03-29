@@ -72,4 +72,22 @@ object GmaxLaprasParticleConfig {
 
 	/** Main cluster billboard alpha (multi-puff aggregate). */
 	const val CLOUD_CLUSTER_MAIN_ALPHA = 0.85f
+
+	/**
+	 * Extra small smoke clusters on the same horizontal orbit layer as the two main masses;
+	 * each uses fewer puffs and a randomized scale below the main clusters.
+	 */
+	const val CLOUD_CLUSTER_SATELLITE_COUNT = 6
+	const val CLOUD_CLUSTER_SATELLITE_PUFFS = 20
+	/** Spread multiplier vs [CLOUD_CLUSTER_SPREAD] for satellite puff layout (tighter blobs). */
+	const val CLOUD_CLUSTER_SATELLITE_SPREAD_FACTOR = 0.48f
+	/**
+	 * Per-satellite overall size multiplier for quad size (random in [min, max]); kept below 1 so
+	 * satellites stay smaller than the two main clusters.
+	 */
+	const val CLOUD_CLUSTER_SATELLITE_SCALE_MIN = 0.38f
+	const val CLOUD_CLUSTER_SATELLITE_SCALE_MAX = 0.68f
+	/** Orbit radius as a fraction of the main [CLOUD_ORBIT_RADIUS_FACTOR] ring (slightly inboard). */
+	const val CLOUD_CLUSTER_SATELLITE_ORBIT_MIN = 0.58f
+	const val CLOUD_CLUSTER_SATELLITE_ORBIT_MAX = 0.94f
 }
