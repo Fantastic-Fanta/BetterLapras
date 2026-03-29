@@ -9,15 +9,12 @@ import kotlin.jvm.JvmStatic
 import kotlin.math.max
 
 /**
- * Gigantamax Lapras: one beam-textured force-field ring per entity, respawned each time the client
- * particle’s 6000-tick lifetime elapses so the effect stays continuous while Gmax is active.
+ * Gigantamax Lapras: force-field ring plus dark red cloud clusters above the body — respawned each time
+ * the client particles’ 6000-tick lifetime elapses so the effect stays continuous while Gmax is active.
  */
 object GmaxLaprasParticles {
 	private const val RING_PARTICLE_LIFETIME_TICKS = 6000L
 	private const val RESPAWN_INTERVAL_TICKS = RING_PARTICLE_LIFETIME_TICKS
-
-	/** Mega Showdown’s team — same as `/team join glow_dynamax_red …`; Glowing outline follows team color. */
-	private const val GLOW_DYNAMAX_RED_TEAM = "glow_dynamax_red"
 
 	private val lastRingSpawnGameTime = ConcurrentHashMap<UUID, Long>()
 
@@ -27,21 +24,9 @@ object GmaxLaprasParticles {
 		val level = entity.level() as? ServerLevel ?: return
 		if (entity.pokemon.species.resourceIdentifier.path != "lapras") return
 		val uuid = entity.uuid
-		val server = level.server
-		val cmd = server.createCommandSourceStack().withPermission(4)
-		val member = entity.scoreboardName
-		val teams = level.scoreboard
-		val currentTeam = teams.getPlayersTeam(member)
-		val glowTeam = teams.getPlayerTeam(GLOW_DYNAMAX_RED_TEAM)
 		if ("gmax" !in entity.pokemon.aspects) {
-			if (currentTeam != null && currentTeam.name == GLOW_DYNAMAX_RED_TEAM) {
-				server.commands.performPrefixedCommand(cmd, "team leave $member")
-			}
 			lastRingSpawnGameTime.remove(uuid)
 			return
-		}
-		if (glowTeam != null && currentTeam != glowTeam) {
-			server.commands.performPrefixedCommand(cmd, "team join $GLOW_DYNAMAX_RED_TEAM $member")
 		}
 		val now = level.gameTime
 		val last = lastRingSpawnGameTime[uuid]
@@ -60,6 +45,14 @@ object GmaxLaprasParticles {
 			GmaxLaprasParticleConfig.RING_Y_OFFSET,
 			(bb.maxY - bb.minY) * GmaxLaprasParticleConfig.FORCE_FIELD_RING_BB_VERTICAL_FRAC,
 		)
+		val cloudOrbitRadius = max(
+			ringRadius * GmaxLaprasParticleConfig.CLOUD_ORBIT_RADIUS_FACTOR,
+			horizontalHalf * 0.28,
+		)
+		val cloudYOffset = max(
+			GmaxLaprasParticleConfig.CLOUD_Y_OFFSET,
+			(bb.maxY - bb.minY) * GmaxLaprasParticleConfig.CLOUD_BB_VERTICAL_FRAC,
+		)
 		// ClientboundLevelParticlesPacket stores delta/speed as floats. Count must be 0 so the client
 		// uses maxSpeed*delta as velocity (deterministic). Count >= 1 applies Gaussian spread and
 		// destroys ring radius / entity id. Entity id is sent as a float (exact for typical ids < 2^24).
@@ -75,6 +68,19 @@ object GmaxLaprasParticles {
 				ringRadius,
 				entity.id.toDouble(),
 				yOffset,
+				1.0,
+			)
+			level.sendParticles(
+				player,
+				BetterLaprasParticles.GMAX_CLOUD_CLUSTERS,
+				true,
+				x,
+				y,
+				z,
+				0,
+				cloudOrbitRadius,
+				entity.id.toDouble(),
+				cloudYOffset,
 				1.0,
 			)
 		}

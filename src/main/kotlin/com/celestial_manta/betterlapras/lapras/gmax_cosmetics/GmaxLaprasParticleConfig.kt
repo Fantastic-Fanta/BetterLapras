@@ -19,6 +19,21 @@ object GmaxLaprasParticleConfig {
 	const val FORCE_FIELD_RING_BB_VERTICAL_FRAC = 0.42
 
 	/**
+	 * Dark red cloud clusters: horizontal orbit radius as a fraction of the same
+	 * [ring radius][GmaxLaprasParticles] uses (smaller = tighter above the body).
+	 */
+	const val CLOUD_ORBIT_RADIUS_FACTOR = 0.44
+
+	/** Minimum feet-relative height for the center of the cloud masses. */
+	const val CLOUD_Y_OFFSET = 13.8
+
+	/**
+	 * Feet-relative height uses the larger of [CLOUD_Y_OFFSET] and this fraction of
+	 * entity bounding-box height so Gmax-sized Lapras keeps clouds clearly above the shell.
+	 */
+	const val CLOUD_BB_VERTICAL_FRAC = 0.88
+
+	/**
 	 * Orbit rate: polar angle θ advances as `gameTime * this` (radians per game tick).
 	 * Particles follow that θ so the sine wave is **drawn along the path** (trail), not a standing ring.
 	 */
