@@ -23,24 +23,12 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.sqrt
 
-/**
- * Lapras overworld move strikes: Cobblemon Snowstorm VFX + sounds + [LaprasMoveProjectile] spawn.
- * Ranged gates use [LaprasShotProfile.rangedMinBlocks] / [LaprasShotProfile.rangedMaxBlocks]; see [RANGED_DISTANCE_HINT_*] for approximate distance bands.
- * Melee: [doHurtTarget] mixin may replace with a move strike (shared cooldown).
- */
+
 object LaprasMoveCombat {
-	/** Default 3 seconds between volleys (20 tps → 60 ticks). */
 	private const val COOLDOWN_TICKS = 60
-
-	/** Ice Shard: 1/3 of default volley spacing (20 ticks ≈ 1 s). */
 	private const val ICE_SHARD_COOLDOWN_TICKS = COOLDOWN_TICKS / 3
-
-	private const val PROJECTILES_PER_VOLLEY = 1
-
-	/** Blocks from Cobblemon eye anchor forward along the shot toward the snout/mouth. */
+	private const val PROJECTILES_PER_VOLLEY = 2
 	private const val MOUTH_OFFSET_ALONG_SHOT = 0.9
-
-	/** Broad band for command/UI text; real min/max are on each [LaprasShotProfile]. */
 	const val RANGED_DISTANCE_HINT_MIN_BLOCKS = 1.0
 	const val RANGED_DISTANCE_HINT_MAX_BLOCKS = 60.0
 

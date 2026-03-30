@@ -24,23 +24,16 @@ import net.minecraft.world.item.ItemStack
 import org.slf4j.LoggerFactory
 
 /**
- * Commands that use [EggUtilities] from Cobbreeding. This type is only referenced from [com.celestial_manta.betterlapras.BetterLapras]
- * when the `cobbreeding` mod is loaded, so missing Cobbreeding does not pull Cobbreeding classes at runtime.
+ * Commands that use [EggUtilities] from Cobbreeding.
  *
- * Egg payloads use the **egg_info** component (AES-128 key in [Cobbreeding.ENCRYPTION_KEY_PATH], decrypted via [EggUtilities.decrypt]).
+ * (AES-128 key in [Cobbreeding.ENCRYPTION_KEY_PATH]
  */
 object CobbreedingEggCommands {
 	private val log = LoggerFactory.getLogger("betterlapras")
-
-	/** Matches decrypted Pokémon spec text (Cobbreeding encrypts `asString(" ")`). */
 	private const val SHINY_SUBSTRING = "shiny=true"
-
 	private val IV_SCAN_LITERALS = listOf("1x31", "2x31", "3x31", "4x31", "5x31", "6x31")
-
 	private const val LAPRAS_SHOWDOWN_ID = "lapras"
-
 	private val laprasPartyRequiredMessage = Component.literal("You need a Lapras in your party to use this command")
-
 	fun register() {
 		CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
 			dispatcher.register(
@@ -302,7 +295,7 @@ object CobbreedingEggCommands {
 		props.shiny?.let { lines.add("Shiny: $it") }
 		props.nature?.takeIf { it.isNotBlank() }?.let { lines.add("Nature: $it") }
 		props.ability?.takeIf { it.isNotBlank() }?.let { lines.add("Ability: $it") }
-		props.pokeball?.takeIf { it.isNotBlank() }?.let { lines.add("Poké Ball: $it") }
+		props.pokeball?.takeIf { it.isNotBlank() }?.let { lines.add("Ball: $it") }
 		val moves = props.moves
 		if (moves != null && moves.isNotEmpty()) {
 			lines.add("Moves: ${moves.joinToString(", ")}")
